@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <math.h>
 
+#define MAT_ROTATE_X 101
+#define MAT_ROTATE_Y 102
+#define MAT_ROTATE_Z 103
+
 class Vector {
 public:
 	float x, y, z, magnitude;
@@ -47,6 +51,53 @@ public:
 
 	Vector* operator-(Point *p) {
 		return new Vector(x - p->x, y - p->y, z - p->z);
+	}
+};
+
+class Ray {
+public:
+	Point *pos;
+	Vector *dir;
+	float t_min, t_max;
+	
+	Ray(Point *p, Vector *v) {
+		// Possibly make copies?
+		pos = p;
+		dir = v;
+		t_min = 1;
+	}
+};
+
+class Matrix {
+public:
+	float mat[4][4];
+
+	Matrix(int kind, float theta) {
+		switch (kind) {
+			case MAT_ROTATE_X:
+				float _mat[4] = {{1, 0, 		   0,  			0}, 
+					   {0, cos(theta), -sin(theta), 0},
+					   {0, sin(theta), cos(theta),  0},
+					   {0, 0, 		   0, 			1}};
+				break;
+			case MAT_ROTATE_Y:
+				float _mat[4] = {{cos(theta), 0, -sin(theta), 0}, 
+					   {0, 			1, 0, 			0},
+					   {sin(theta), 0, cos(theta),  0},
+					   {0, 			0, 0, 			1}};
+				break;
+			case MAT_ROTATE_Z:
+				float _mat[4][4] = {{cos(theta), -sin(theta), 0, 0}, 
+					   {sin(theta), cos(theta),  0, 0},
+					   {0, 			0, 			 1, 0},
+					   {0, 			0, 			 0, 1}};
+				break;
+		}
+		mat = _mat;
+	}
+
+	Matrix(int kind) {
+
 	}
 };
 
