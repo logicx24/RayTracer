@@ -5,7 +5,6 @@
 #define MAT_ROTATE_Y 102
 #define MAT_ROTATE_Z 103
 
-
 class Vector {
 public:
 	float x, y, z, magnitude;
@@ -71,40 +70,30 @@ public:
 
 class Matrix {
 public:
-	float mat[4][4];
+	float mat[4][4] = {{}};
 
 	Matrix(int kind, float theta) {
-		for (int x = 0; x < 4; x++) {
-			for (int y = 0; y < 4; y++) {
-				mat[y][x] = 0.0f;
-			}
-		}
 		switch (kind) {
 			case MAT_ROTATE_X:
-				mat[0][0] = 1.0f;
-				mat[1][1] = cos(theta);
-				mat[2][1] = -sin(theta);
-				mat[2][1] = sin(theta);
-				mat[2][2] = cos(theta);
-				mat[3][3] = 1.0f;
+				float _mat[4][4] = {{1, 0, 		   0,  			0}, 
+					   {0, cos(theta), -sin(theta), 0},
+					   {0, sin(theta), cos(theta),  0},
+					   {0, 0, 		   0, 			1}};
 				break;
 			case MAT_ROTATE_Y:
-				mat[0][0] = cos(theta);
-				mat[0][2] = -sin(theta);
-				mat[1][1] = 1.0f;
-				mat[2][0] = sin(theta);
-				mat[2][1] = cos(theta);
-				mat[3][3] = 1.0f;
+				float _mat[4][4] = {{cos(theta), 0, -sin(theta), 0}, 
+					   {0, 			1, 0, 			0},
+					   {sin(theta), 0, cos(theta),  0},
+					   {0, 			0, 0, 			1}};
 				break;
 			case MAT_ROTATE_Z:
-				mat[0][0] = cos(theta);
-				mat[0][2] = -sin(theta);
-				mat[1][0] = sin(theta);
-				mat[1][1] = cos(theta);
-				mat[2][2] = 1.0f;
-				mat[3][3] = 1.0f;
+				float _mat[4][4] = {{cos(theta), -sin(theta), 0, 0}, 
+					   {sin(theta), cos(theta),  0, 0},
+					   {0, 			0, 			 1, 0},
+					   {0, 			0, 			 0, 1}};
 				break;
 		}
+		mat = _mat;
 	}
 
 	Matrix(int kind) {
