@@ -1,10 +1,10 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 
 #define MAT_ROTATE_X 101
 #define MAT_ROTATE_Y 102
 #define MAT_ROTATE_Z 103
-
 
 class Vector {
 public:
@@ -109,6 +109,49 @@ public:
 
 	Matrix(int kind) {
 
+	}
+};
+
+class Color {
+public:
+    float r, g, b;
+    Color(float _r=0.0f, float _g=0.0f, float _b=0.0f) {
+    	r = _r;
+    	g = _g;
+    	b = _b;
+    }
+};
+
+
+class Film {
+public:
+    int width, height;
+    Color **film;
+    Film(int _width, int _height) {
+    	width = _width;
+    	height = _height;
+    	film = new Color*[width * height];
+    }
+
+    void commit(Sample& sample, Color& color) {
+
+    }
+};
+
+class Scene {
+public:
+	Point *eye, *ul, *ur, *ll, *lr;
+	int width, height;
+
+	Scene(Point *_eye, Point *_ul, Point *_ur, Point *_ll, Point *_lr, 
+		  int _width, int _height) {
+		eye = _eye;
+		ul = _ul;
+		ur = _ur;
+		ll = _ll;
+		lr = _lr;
+		width = _width;
+		height = _height;
 	}
 };
 
