@@ -1,10 +1,16 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
+#include "lodepng.h"
+
+#include <vector>
+#include <iostream>
+
 
 #define MAT_ROTATE_X 101
 #define MAT_ROTATE_Y 102
 #define MAT_ROTATE_Z 103
+
+using namespace std;
 
 class Vector {
 public:
@@ -122,19 +128,82 @@ public:
     }
 };
 
+class Sample {
+public:
+    int x, y;
+    Sample(int _x, int _y) {
+    	x = _x;
+    	y = _y;
+    }
+};
+
+class Sampler {
+public:
+    int width, height;
+    int x, y;
+
+    Sampler(int _width, int _height) {
+    	width = _width;
+    	height = _height;
+        x = 0;
+        y = 0;
+    }
+
+    bool generateSample(Sample *sample) {
+        if (y  == height) {
+        	return false;
+        }
+    	sample->x = x;
+    	sample->y = y;
+        if (x == width - 1) {
+        	x = 0;
+            y++;
+        } else {
+        	x++;
+        }
+        return true;
+    }
+
+};
 
 class Film {
 public:
     int width, height;
-    Color **film;
+    Color *film;
     Film(int _width, int _height) {
     	width = _width;
     	height = _height;
-    	film = new Color*[width * height];
+    	film = new Color[width * height];
     }
 
-    void commit(Sample& sample, Color& color) {
+    void writeToFilm(Sample *sample, Color *color) {
+        film[sample->y * width + sample->x].r = color->r;
+        film[sample->y * width + sample->x].g = color->g;
+        film[sample->y * width + sample->x].b = color->b;
+    }
 
+    void writeFile() {
+        vector<unsigned char> image;
+        int area = width * height;
+        for (int i = 0; i < area; i++) {
+        	image.push_back(0);
+        	image.push_back(0);
+        	image.push_back(0);
+        	image.push_back(255);
+        }
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+            	int position = 4 * (y * width + x);
+            	image.at(position)     = film[y * width + x].r;
+            	image.at(position + 1) = film[y * width + x].g;
+            	image.at(position + 2) = film[y * width + x].b;
+            	image.at(position + 3) = 255; 
+            }
+        }
+        unsigned error = lodepng::encode("img.png", image, width, height);
+        if (error) {
+        	cout << "lodepng error" << endl;
+        }
     }
 };
 
@@ -142,21 +211,47 @@ class Scene {
 public:
 	Point *eye, *ul, *ur, *ll, *lr;
 	int width, height;
+	Film *film;
 
 	Scene(Point *_eye, Point *_ul, Point *_ur, Point *_ll, Point *_lr, 
-		  int _width, int _height) {
+		  Film *_film, int _width, int _height) {
 		eye = _eye;
 		ul = _ul;
 		ur = _ur;
 		ll = _ll;
 		lr = _lr;
+		film = _film;
 		width = _width;
 		height = _height;
 	}
+
+    void writeToFilm();
+
+    void renderLoop() {
+        
+    }
+
+
 };
 
+void testFilm() {
+	int height = 100;
+	int width = 100;
+	Film *film = new Film(width, height);
+	Sampler *sampler = new Sampler(width, height);
+	Sample *sample = new Sample(0, 0);
+	Color *color = new Color(0, 0, 0);
+    while (sampler->generateSample(sample)) {
+    	//cout << "x: " << sample->x << endl;
+    	//cout << "y: " << sample->y << endl;
+        film->writeToFilm(sample, color);
+    }
+    film->writeFile();
+}
 
 int main(int argc, char* argv[]) {
 	printf("Ray Tracer!\n");
+	testFilm();
 	return 0;
 }
+
