@@ -2,11 +2,11 @@ CC = g++
 RM = /bin/rm -f 
 
 all: main
-main: raytracer.o
+main: raytracer.o lodepng.o
 	$(CC) -o raytracer raytracer.o lodepng.o
-raytracer.o: lodepng raytracer.cpp
+raytracer.o:
 	$(CC) -c raytracer.cpp -o raytracer.o
-lodepng:
+lodepng.o:
 	$(CC) -c lodepng.cpp -o lodepng.o
 clean:
-	$(RM) *.o raytracer
+	$(RM) *.o raytracer lodepng
