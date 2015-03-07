@@ -1,11 +1,9 @@
-#hdr
 #include <stdio.h>
 #include <math.h>
 #include "lodepng.h"
 
 #include <vector>
 #include <iostream>
-#end
 
 
 #define MAT_ROTATE_X 101
@@ -74,7 +72,7 @@ public:
 		pos = p;
 		dir = v;
 		t_min = 1;
-		t_max = MAX_FLOAT;
+		t_max = 10000000.0f;
 	}
 };
 
@@ -188,6 +186,7 @@ public:
     void writeFile() {
         vector<unsigned char> image;
         int area = width * height;
+        
         for (int i = 0; i < area; i++) {
         	image.push_back(0);
         	image.push_back(0);
@@ -210,6 +209,37 @@ public:
     }
 };
 
+class Sphere {
+public:
+	Point *center;
+	float radius;
+
+	Sphere(Point *_center, float _radius) {
+		center = _center;
+		radius = _radius;
+	}
+
+	bool intersects(Ray *ray) {
+		// (d * (e - c)) - (d * d)((e-c) * (e-c))
+        float discriminant = pow(ray->dir * (ray->pos - center), 2) - 
+					 (ray->dir * ray->dir)*(((ray->pos - center)*(ray->pos - center))
+					 - pow(radius, 2));
+		return discriminant >= 0;
+	}
+
+	Point intersectsAt(Ray *ray) {
+		float discriminant = pow(ray->dir * (ray->pos - center), 2) - 
+					 (ray->dir * ray->dir)*(((ray->pos - center)*(ray->pos - center))
+					 - pow(radius, 2));
+		float soln1 = (((ray->dir) * -1.0f) * (ray->pos - center) + sqrt(discriminant))/(ray->dir * ray->dir);
+		float soln2 = (((ray->dir) * -1.0f)* (ray->pos - center) - sqrt(discriminant))/(ray->dir * ray->dir);
+		//Figure out which solution is correct.
+		return new Point(ray->pos->x + soln1*ray->dir->x, ray->pos->y + soln1*ray->dir->y, ray->pos->z + soln1*ray->dir->z);
+
+	}
+
+};
+
 class Scene {
 public:
 	Point *eye, *ul, *ur, *ll, *lr;
@@ -227,8 +257,31 @@ public:
 		width = _width;
 		height = _height;
 	}
-
-    void writeToFilm();
+    
+    void testSphere() {
+    	Sampler *sampler = new Sampler(width, height);
+    	Sample *sample = new Sample(0, 0);
+    	Color *black = new Color(0, 0, 0);
+    	Color *red = new Color(255, 0, 0);
+    	Point *center = new Point(50, 50, 10);
+    	Sphere *sphere = new Sphere(center, 10);
+        while (sampler->generateSample(sample)) {
+        	Vector *testRayDir = new Vector(sample->x - eye->x, sample->y - eye->y, -eye->z);
+        	Point *testRayPoint = new Point(eye->x, eye->y, eye->z);
+        	Ray *testRay = new Ray(testRayPoint, testRayDir);
+            if (sphere->intersects(testRay)) {
+            	film->writeToFilm(sample, red);
+            	//cout << "RED" << endl;
+            } else {
+            	film->writeToFilm(sample, black);
+            	//cout << "BLACK" << endl;
+            }
+            delete testRayDir;
+            delete testRayPoint;
+            delete testRay;
+        }
+        film->writeFile();
+    }
 
     void renderLoop() {
         
@@ -236,36 +289,7 @@ public:
 
 };
 
-class Sphere {
-public:
-	Point *center;
-	float radius;
 
-	Sphere(Point *_center, float _radius) {
-		center = _center;
-		radius = _radius;
-	}
-
-	bool intersects(Ray *ray) {
-		// (d * (e - c)) - (d * d)((e-c) * (e-c))
-		float discriminant = pow(ray->dir * (ray->pos - *center), 2) - 
-							 (ray->dir * ray->dir)*(((ray->pos - *center)*(ray->pos - *center))
-							 - pow(radius, 2));
-		return discriminant < 0;
-	}
-
-	Point intersectsAt(Ray *ray) {
-		float discriminant = pow(ray->dir * (ray->pos - *center), 2) - 
-					 (ray->dir * ray->dir)*(((ray->pos - *center)*(ray->pos - *center))
-					 - pow(radius, 2));
-		float soln1 = (-(ray->dir) * (ray->pos - *center) + sqrt(discriminant))/(ray->dir * ray->dir);
-		float soln2 = (-(ray->dir) * (ray->pos - *center) - sqrt(discriminant))/(ray->dir * ray->dir);
-		//Figure out which solution is correct.
-		return new Point(ray->pos->x + soln1*ray->dir->x, ray->pos->y + soln1*ray->dir->y, ray->pos->z + soln1*ray->dir->z);
-
-	}
-
-};
 
 void testFilm() {
 	int height = 100;
@@ -284,8 +308,15 @@ void testFilm() {
 
 
 int main(int argc, char* argv[]) {
-	printf("Ray Tracer!\n");
-	testFilm();
+	printf("Ray Tracer1!\n");
+	Point *eye = new Point(50, 50, -10);
+	Point *ul = new Point (0, 99, 0);
+	Point *ur = new Point (99, 99, 0);
+	Point *ll = new Point (0, 0, 0);
+	Point *lr = new Point (99, 0, 0);
+	Film *film = new Film(100, 100);
+	Scene *scene = new Scene(eye, ul, ur, ll, lr, film, 100, 100);
+	scene->testSphere();
 	return 0;
 }
 
