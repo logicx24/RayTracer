@@ -1,9 +1,11 @@
+#hdr
 #include <stdio.h>
 #include <math.h>
 #include "lodepng.h"
 
 #include <vector>
 #include <iostream>
+#end
 
 
 #define MAT_ROTATE_X 101
@@ -259,7 +261,8 @@ public:
 		float soln1 = (-(ray->dir) * (ray->pos - *center) + sqrt(discriminant))/(ray->dir * ray->dir);
 		float soln2 = (-(ray->dir) * (ray->pos - *center) - sqrt(discriminant))/(ray->dir * ray->dir);
 		//Figure out which solution is correct.
-		return soln1;
+		return new Point(ray->pos->x + soln1*ray->dir->x, ray->pos->y + soln1*ray->dir->y, ray->pos->z + soln1*ray->dir->z);
+
 	}
 
 };
