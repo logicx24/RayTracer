@@ -72,6 +72,7 @@ public:
 		pos = p;
 		dir = v;
 		t_min = 1;
+		t_max = MAX_FLOAT;
 	}
 };
 
@@ -231,6 +232,35 @@ public:
         
     }
 
+};
+
+class Sphere {
+public:
+	Point *center;
+	float radius;
+
+	Sphere(Point *_center, float _radius) {
+		center = _center;
+		radius = _radius;
+	}
+
+	bool intersects(Ray *ray) {
+		// (d * (e - c)) - (d * d)((e-c) * (e-c))
+		float discriminant = pow(ray->dir * (ray->pos - *center), 2) - 
+							 (ray->dir * ray->dir)*(((ray->pos - *center)*(ray->pos - *center))
+							 - pow(radius, 2));
+		return discriminant < 0;
+	}
+
+	Point intersectsAt(Ray *ray) {
+		float discriminant = pow(ray->dir * (ray->pos - *center), 2) - 
+					 (ray->dir * ray->dir)*(((ray->pos - *center)*(ray->pos - *center))
+					 - pow(radius, 2));
+		float soln1 = (-(ray->dir) * (ray->pos - *center) + sqrt(discriminant))/(ray->dir * ray->dir);
+		float soln2 = (-(ray->dir) * (ray->pos - *center) - sqrt(discriminant))/(ray->dir * ray->dir);
+		//Figure out which solution is correct.
+		return soln1;
+	}
 
 };
 
@@ -248,6 +278,7 @@ void testFilm() {
     }
     film->writeFile();
 }
+
 
 int main(int argc, char* argv[]) {
 	printf("Ray Tracer!\n");
