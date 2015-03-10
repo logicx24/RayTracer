@@ -8,7 +8,13 @@
 
 
 using namespace std;
+void printVec3(vec3 &vec) {
+	cout << "x: " << vec[VX] << " y: " << vec[VY] << " Z: " << vec[VZ] << endl;
+}
 
+float distance(vec3 &p1, vec3 &p2) {
+	return sqrt(p1[VX]*p2[VX] + p1[VY]*p2[VY] + p1[VZ]*p2[VZ]);
+}
 class Color {
 public:
     float r, g, b;
@@ -19,7 +25,25 @@ public:
     }
 };
 
+class Material {
+public:
+    vec3 ka, kd, ks;
+    float sp;
+    
+    Material() {
+    	ka = vec3(0, 0, 0);
+    	kd = vec3(0, 0, 0);
+    	ks = vec3(0, 0, 0);
+    	sp = 0.0f;
+    }
 
+    Material(vec3 &_ka, vec3 &_kd, vec3 &_ks, float _sp) {
+    	ka = _ka;
+    	kd = _kd;
+    	ks = _ks;
+    	sp = _sp;
+    }
+};
 class Ray {
 public:
 	vec3 pos;
@@ -35,7 +59,27 @@ public:
 	}
 };
 
+class Light {
+public:
+    Color color;
+    vec3 pos;
+    bool pointLight;
 
+    Light(Color &_color, vec3 &_pos, bool _pointLight) {
+    	color = _color;
+    	pos = _pos;
+    	pointLight = _pointLight;
+    }
+
+    vec3 lightVec(vec3 &point) {
+        if (pointLight) {
+        	return (point - pos);
+        } else {
+        	return -pos;
+        }
+    }
+
+};
 
 class Sample {
 public:
@@ -90,14 +134,23 @@ public:
     }
 
     void writeToFilm(Sample &sample, Color &color) {
+    	if (color.r > 255) {color.r = 255;}
+    	if (color.g > 255) {color.g = 255;}
+    	if (color.b > 255) {color.b = 255;}
         film[sample.y * width + sample.x].r = color.r;
         film[sample.y * width + sample.x].g = color.g;
         film[sample.y * width + sample.x].b = color.b;
     }
 
-    void writeFile() {
+    void writeFile(int pixWidth, int pixHeight) {
+        if (pixWidth % width != 0 || pixHeight % height != 0) {
+        	cerr << "Image will not fit nicely into output dimensions." << endl;
+        	exit(0);
+        }
+        int widthScale = pixWidth / width;
+        int heightScale = pixHeight / height;
         vector<unsigned char> image;
-        int area = width * height;
+        int area = pixWidth * pixHeight;
         
         for (int i = 0; i < area; i++) {
         	image.push_back(0);
@@ -121,25 +174,59 @@ public:
     }
 };
 
-class Sphere {
+class Polygon {
+public:
+    Material mat;
+    Polygon(){};
+    virtual bool intersects(Ray &ray) = 0;
+    virtual float intersectsAt(Ray &ray) = 0;
+    virtual vec3 normalAt(vec3 &point) = 0;
+};
+
+class Sphere : public Polygon {
 public:
 	vec3 center;
 	float radius;
 
-	Sphere(vec3 &_center, float _radius) {
+	Sphere(vec3 &_center, float _radius, Material &_mat) {
 		center = _center;
 		radius = _radius;
+		mat = _mat;
 	}
 
 	bool intersects(Ray &ray) {
-		// (d * (e - c)) - (d * d)((e-c) * (e-c))
+		// discriminant = (d * (e - c)) - (d * d)((e-c) * (e-c))
+		// d = ray.pos
 		vec3 p_c = ray.pos - center;
-        //p_c.normalize();
         float discriminant = pow(ray.vec * p_c, 2) - 
         ((ray.vec * ray.vec) * ((p_c * p_c) - pow(radius, 2)));
-        cout << "d: " << discriminant << endl;
-		return discriminant >=  0;
+		return discriminant >= 0.0f;
 	}
+    
+	float intersectsAt(Ray &ray) {
+		vec3 p_c = ray.pos - center;
+        vec3 d = ray.vec;
+        float discriminant = pow(d * p_c, 2) - ((d * d) * ((p_c * p_c) - pow(radius, 2)));
+		float t1 = (-d*(p_c) + sqrt(discriminant)) / (d * d);
+		float t2 = (-d*(p_c) - sqrt(discriminant)) / (d * d);
+		/*
+		vec3 p1 = ray.pos + ray.vec * t1;
+		vec3 p2 = ray.pos + ray.vec * t2;
+		float d1 = distance(ray.pos, p1);
+		float d2 = distance(ray.pos, p2);
+        if (d1 < d2) {
+        	return ray.pos + p1;
+        } else {
+        	return ray.pos + p2;
+        }*/
+        return MIN(t1, t2);
+	}
+
+    vec3 normalAt(vec3 &point) {
+    	vec3 normal = (point - center) / radius;
+    	//printVec3(normal);
+    	return normal;
+    }
 };
 
 class Camera {
@@ -164,14 +251,9 @@ public:
 	Ray generateRay(Sample &sample) {
         float u = sample.x / float(width);
         float v = sample.y / float(height);
-        // cout << sample.x << " : " << sample.y << endl;
-        // cout << width << " : " << height << endl;
-        // cout << u << " : " << v << endl;
         vec3 c = (ll*(1-u) + lr*u)*(1-v) + (ul*(1-u) + ur*u)*v;
-        //cout << "1. " << c[VX] << " : " << c[VY] << " : " << c[VZ] << endl;
         vec3 testRayVec = c - eye;
         testRayVec = testRayVec.normalize();
-        //cout << "2. " << c[VX] << " : " << c[VY] << " : " << c[VZ] << endl;
 	    return Ray(eye, testRayVec); 
 	}
 };
@@ -181,7 +263,9 @@ class Scene {
 public:
 	Camera cam;
 	Film film;
-	vector<Sphere> objects;
+	vector<Polygon*> objects;
+	vector<Light*> lights;
+
 	int width, height;
 	
 	Scene(Camera &_cam, Film &_film, int _width, int _height)  {
@@ -191,41 +275,88 @@ public:
 		height = _height;
 	}
 
-	void addObject(Sphere &s) {
- 		objects.push_back(s);
+	void addObject(Polygon *p) {
+ 		objects.push_back(p);
 	}
-    
 
-    void renderLoop() {
+    void addLight(Light *l) {
+    	lights.push_back(l);
+    }
+
+    void render() {
     	Sampler sampler = Sampler(width, height);
     	Sample sample = Sample();
-    	// Ray testRay = Ray(rayPos, rayVec);
     	while (sampler.generateSample(&sample)) {
-    		//cout << "x: " << sample.x << " y: " << sample.y << endl;
     		Ray testRay = cam.generateRay(sample);
     		Color c = traceRay(testRay);
-    		//cout << "r: " << c.r << " g: " << c.g << " b: " << c.b << endl;
     		film.writeToFilm(sample, c);
     	}
 
-        film.writeFile();
+    }
+
+    void writeFile(int pixWidth, int pixHeight) {
+    	film.writeFile(pixWidth, pixHeight);
     }
 
     Color traceRay(Ray &ray) {
-    	Color black = Color(0, 0, 0);
-    	Color red = Color(255, 0, 0);
-    	//cout << objects.size() << endl;
+    	float min_t = MAXFLOAT;
+    	int closeIndex = 0;
 		for (int i = 0; i < objects.size(); i++) {
-			if (objects[i].intersects(ray)) {
-				return Color(255, 0, 0);
+			if (objects[i]->intersects(ray)) {
+		        float t = objects[i]->intersectsAt(ray);
+                if (t < min_t) {
+                	min_t = t;
+                	closeIndex = i;
+                }
+		        
+				//return Color(255, 0, 0);
 				// Recurse from objects[i]->intersectsAt(testRay) and bounce dir!
 				// Shade!
-
-			} else {
-				return Color(0, 0, 0);
-			}
+		    }
 		}
-		return Color(0, 0, 0);
+		if (min_t != MAXFLOAT) {
+		    vec3 intersection = ray.pos + min_t * ray.vec;
+            vec3 normal = objects[closeIndex]->normalAt(intersection);
+        	return phongShade(ray, objects[closeIndex], normal, intersection);
+		} else {
+		    return Color(0, 0, 0);
+
+        }
+    }
+
+    bool traceShadowRay(Ray &ray, Polygon *p) {
+    	//cout << objects.size() << endl;
+        for (int i = 0; i < objects.size(); i++) {
+            if (objects[i]->intersects(ray) && objects[i] != p) {
+            	//cout << "HALLO" << endl;
+            	return true;
+            }
+        }
+        return false;
+    }
+
+    Color phongShade(Ray &ray, Polygon *polygon, vec3 &normal, vec3 &point) {
+        Color total_intensity = Color(0, 0, 0);
+        for (int i = 0; i < lights.size(); i++) {
+        	Color intensity = lights[i]->color;
+        	vec3 shadowRayVec = (lights[i]->pos - point).normalize();
+        	Ray shadowRay = Ray(point, shadowRayVec);
+            if (traceShadowRay(shadowRay, polygon)) {
+            	continue;
+            }
+        	vec3 l = lights[i]->lightVec(point);
+            vec3 v = -ray.vec;
+            vec3 r = -l + ((2*(l * normal)) * normal);
+            l.normalize();
+        	v.normalize();
+        	r.normalize();
+            vec3 coeffs = polygon->mat.ka + polygon->mat.kd * MAX(l * normal, -0.0f) 
+                        + polygon->mat.ks * pow(MAX(r * v, 0.0f), polygon->mat.sp);
+            total_intensity.r += intensity.r * coeffs[RED];
+            total_intensity.g += intensity.g * coeffs[GREEN];
+            total_intensity.b += intensity.b * coeffs[BLUE];
+        }
+        return total_intensity; 
     }
 
 };
@@ -235,8 +366,8 @@ public:
 
 int main(int argc, char* argv[]) {
 	printf("Ray Tracer!\n");
-	int width = 100;
-	int height = 100;
+	int width = 1000;
+	int height = 1000;
 	vec3 eye = vec3(0, 0, 0);
 	vec3 ul = vec3(-1, 1, -1);
 	vec3 ur = vec3(1, 1, -1);
@@ -245,14 +376,35 @@ int main(int argc, char* argv[]) {
 	Film film = Film(width, height);
     Camera cam = Camera(eye, ul, ur, ll, lr, width, height);
 	Scene scene = Scene(cam, film, width, height);
+    
 
+    vec3 ka = vec3(0.05, 0.05, 0.05);
+    vec3 kd = vec3(1, 1, 1);
+    vec3 ks = vec3(1, 1, 1);
+    float sp = 10;
+    Material sphereMat = Material(ka, kd, ks, sp);
+	
+	vec3 sphereCenter1 = vec3(-5, -5, -10);
+	Sphere sphere1 = Sphere(sphereCenter1, 2, sphereMat);
+	scene.addObject(&sphere1);
+	
+	vec3 sphereCenter2 = vec3(0, 0, -5);
+	Sphere sphere2 = Sphere(sphereCenter2, 0.4, sphereMat);
+	scene.addObject(&sphere2);
 
-	vec3 sphereCenter = vec3(0, 0, -2);
-	Sphere sphere = Sphere(sphereCenter, 1);
-	scene.addObject(sphere);
+    Color lightColor1 = Color(255, 130, 255);
+    vec3 lightPos1 = vec3(0, 0, -1);
+	Light dl1 = Light(lightColor1, lightPos1, false);
+	scene.addLight(&dl1);
 
-
-	scene.renderLoop();
+    Color lightColor2 = Color(9, 130, 255);
+    vec3 lightPos2 = vec3(0, 0, 0);
+	Light dl2 = Light(lightColor2, lightPos2, true);
+	//scene.addLight(&dl2);
+	
+	scene.render();
+	scene.writeFile(width, height);
+	
 	return 0;
 }
 
