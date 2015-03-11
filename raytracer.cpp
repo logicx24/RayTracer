@@ -15,22 +15,6 @@ void printVec3(vec3 &vec) {
 float distance(vec3 &p1, vec3 &p2) {
 	return sqrt(p1[VX]*p2[VX] + p1[VY]*p2[VY] + p1[VZ]*p2[VZ]);
 }
-class Color {
-public:
-    float r, g, b;
-    Color(float _r=0.0f, float _g=0.0f, float _b=0.0f) {
-    	r = _r;
-    	g = _g;
-    	b = _b;
-    }
-
-    Color add(Color color) {
-    	return Color(r + color.r, g + color.g, b + color.b);
-    }
-    Color scale(float scale) {
-    	return Color(scale*r, scale*g, scale*b);
-    }
-};
 
 class Material {
 public:
@@ -70,11 +54,11 @@ public:
 
 class Light {
 public:
-    Color color;
+    vec3 color;
     vec3 pos;
     bool pointLight;
 
-    Light(Color &_color, vec3 &_pos, bool _pointLight) {
+    Light(vec3 &_color, vec3 &_pos, bool _pointLight) {
     	color = _color;
     	pos = _pos;
     	pointLight = _pointLight;
@@ -132,23 +116,25 @@ public:
 class Film {
 public:
     int width, height;
-    Color *film;
+    vector<vec3> film;
 
     Film(){}
 
     Film(int _width, int _height) {
     	width = _width;
     	height = _height;
-    	film = new Color[width * height];
+        for (int i = 0; i < width * height; i++) {
+        	film.push_back(vec3(0, 0, 0));
+        }
     }
 
-    void writeToFilm(Sample &sample, Color &color) {
-    	if (color.r > 255) {color.r = 255;}
-    	if (color.g > 255) {color.g = 255;}
-    	if (color.b > 255) {color.b = 255;}
-        film[sample.y * width + sample.x].r = color.r;
-        film[sample.y * width + sample.x].g = color.g;
-        film[sample.y * width + sample.x].b = color.b;
+    void writeToFilm(Sample &sample, vec3 &color) {
+    	if (color[RED] > 255) {color[RED] = 255;}
+    	if (color[GREEN] > 255) {color[GREEN] = 255;}
+    	if (color[BLUE] > 255) {color[BLUE] = 255;}
+        film.at(sample.y * width + sample.x)[RED] = color[RED];
+        film.at(sample.y * width + sample.x)[GREEN] = color[GREEN];
+        film.at(sample.y * width + sample.x)[BLUE] = color[BLUE];
     }
 
     void writeFile(int pixWidth, int pixHeight) {
@@ -170,9 +156,9 @@ public:
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
             	int position = 4 * (y * width + x);
-            	image.at(position)     = film[y * width + x].r;
-            	image.at(position + 1) = film[y * width + x].g;
-            	image.at(position + 2) = film[y * width + x].b;
+            	image.at(position)     = film.at(y * width + x)[RED];
+            	image.at(position + 1) = film.at(y * width + x)[GREEN];
+            	image.at(position + 2) = film.at(y * width + x)[BLUE];
             	image.at(position + 3) = 255; 
             }
         }
@@ -276,13 +262,14 @@ public:
 	vector<Light*> lights;
 
 	int width, height;
-	int maxDepth = 5;
+	int maxDepth;
 
 	Scene(Camera &_cam, Film &_film, int _width, int _height)  {
 		cam = _cam;
 		film = _film;
 		width = _width;
 		height = _height;
+		maxDepth = 5;
 	}
 
 	void addObject(Polygon *p) {
@@ -298,7 +285,7 @@ public:
     	Sample sample = Sample();
     	while (sampler.generateSample(&sample)) {
     		Ray testRay = cam.generateRay(sample);
-    		Color c = traceRay(testRay);
+    		vec3 c = traceRay(testRay);
     		film.writeToFilm(sample, c);
     	}
 
@@ -308,7 +295,7 @@ public:
     	film.writeFile(pixWidth, pixHeight);
     }
 
-    Color traceRay(Ray &ray) {
+    vec3 traceRay(Ray &ray) {
     	float min_t = MAXFLOAT;
     	int closeIndex = 0;
 		for (int i = 0; i < objects.size(); i++) {
@@ -325,16 +312,18 @@ public:
             vec3 normal = objects[closeIndex]->normalAt(intersection);
             vec3 reflectionVec = (ray.vec - 2*(ray.vec * normal)*normal);
             Ray reflected = Ray(intersection, reflectionVec);
-        	return phongShade(ray, objects[closeIndex], normal, intersection).add(traceReflection(reflected, maxDepth, objects[closeIndex]).scale(objects[closeIndex]->mat.kr));
+        	return phongShade(ray, objects[closeIndex], normal, intersection)
+        	               + (traceReflection(reflected, maxDepth, objects[closeIndex])
+        	               * objects[closeIndex]->mat.kr);
 		} else {
-		    return Color(0, 0, 0);
+		    return vec3(0, 0, 0);
 
         }
     }
 
-    Color traceReflection(Ray &ray, int depth, Polygon *original) {
+    vec3 traceReflection(Ray &ray, int depth, Polygon *original) {
     	if (depth == 0) {
-    		return Color(0, 0, 0);
+    		return vec3(0, 0, 0);
     	}
     	float min_t = MAXFLOAT;
     	int closeIndex = 0;
@@ -352,9 +341,11 @@ public:
             vec3 normal = objects[closeIndex]->normalAt(intersection);
             vec3 reflectionVec = (ray.vec - 2*(ray.vec * normal)*normal);
             Ray reflected = Ray(intersection, reflectionVec);
-        	return phongShade(ray, objects[closeIndex], normal, intersection).add(traceReflection(reflected, depth-1, objects[closeIndex]).scale(objects[closeIndex]->mat.kr));
+        	return phongShade(ray, objects[closeIndex], normal, intersection) 
+        	     + (traceReflection(reflected, depth-1, objects[closeIndex]) 
+        	     * objects[closeIndex]->mat.kr);
 		} else {
-		    return Color(0, 0, 0);
+		    return vec3(0, 0, 0);
         }
     }
 
@@ -369,10 +360,10 @@ public:
         return false;
     }
 
-    Color phongShade(Ray &ray, Polygon *polygon, vec3 &normal, vec3 &point) {
-        Color total_intensity = Color(0, 0, 0);
+    vec3 phongShade(Ray &ray, Polygon *polygon, vec3 &normal, vec3 &point) {
+        vec3 total_intensity = vec3(0, 0, 0);
         for (int i = 0; i < lights.size(); i++) {
-        	Color intensity = lights[i]->color;
+        	vec3 intensity = lights[i]->color;
         	vec3 shadowRayVec = (lights[i]->pos - point).normalize();
         	Ray shadowRay = Ray(point, shadowRayVec);
             if (traceShadowRay(shadowRay, polygon)) {
@@ -386,9 +377,9 @@ public:
         	r.normalize();
             vec3 coeffs = polygon->mat.ka + polygon->mat.kd * MAX(l * normal, -0.0f) 
                         + polygon->mat.ks * pow(MAX(r * v, 0.0f), polygon->mat.sp);
-            total_intensity.r += intensity.r * coeffs[RED];
-            total_intensity.g += intensity.g * coeffs[GREEN];
-            total_intensity.b += intensity.b * coeffs[BLUE];
+            total_intensity[RED] += intensity[RED] * coeffs[RED];
+            total_intensity[GREEN] += intensity[GREEN] * coeffs[GREEN];
+            total_intensity[BLUE] += intensity[BLUE] * coeffs[BLUE];
         }
         return total_intensity; 
     }
@@ -439,7 +430,7 @@ int main(int argc, char* argv[]) {
 	Sphere sphere3 = Sphere(sphereCenter3, 2.0f, sphereMat);
 	scene.addObject(&sphere3);
 
-    Color lightColor1 = Color(122, 130, 20);
+    vec3 lightColor1 = vec3(122, 130, 20);
     vec3 lightPos1 = vec3(0, 0, -1);
 	Light dl1 = Light(lightColor1, lightPos1, false);
 	scene.addLight(&dl1);
