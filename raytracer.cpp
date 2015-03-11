@@ -23,24 +23,33 @@ public:
     	g = _g;
     	b = _b;
     }
+
+    Color add(Color color) {
+    	return Color(r + color.r, g + color.g, b + color.b);
+    }
+    Color scale(float scale) {
+    	return Color(scale*r, scale*g, scale*b);
+    }
 };
 
 class Material {
 public:
     vec3 ka, kd, ks;
-    float sp;
+    float sp, kr;
     
     Material() {
     	ka = vec3(0, 0, 0);
     	kd = vec3(0, 0, 0);
     	ks = vec3(0, 0, 0);
+    	kr = 0.0f;
     	sp = 0.0f;
     }
 
-    Material(vec3 &_ka, vec3 &_kd, vec3 &_ks, float _sp) {
+    Material(vec3 &_ka, vec3 &_kd, vec3 &_ks, float _kr, float _sp) {
     	ka = _ka;
     	kd = _kd;
     	ks = _ks;
+    	kr = _kr;
     	sp = _sp;
     }
 };
@@ -267,7 +276,8 @@ public:
 	vector<Light*> lights;
 
 	int width, height;
-	
+	int maxDepth = 5;
+
 	Scene(Camera &_cam, Film &_film, int _width, int _height)  {
 		cam = _cam;
 		film = _film;
@@ -308,19 +318,43 @@ public:
                 	min_t = t;
                 	closeIndex = i;
                 }
-		        
-				//return Color(255, 0, 0);
-				// Recurse from objects[i]->intersectsAt(testRay) and bounce dir!
-				// Shade!
 		    }
 		}
 		if (min_t != MAXFLOAT) {
 		    vec3 intersection = ray.pos + min_t * ray.vec;
             vec3 normal = objects[closeIndex]->normalAt(intersection);
-        	return phongShade(ray, objects[closeIndex], normal, intersection);
+            vec3 reflectionVec = (ray.vec - 2*(ray.vec * normal)*normal);
+            Ray reflected = Ray(intersection, reflectionVec);
+        	return phongShade(ray, objects[closeIndex], normal, intersection).add(traceReflection(reflected, maxDepth, objects[closeIndex]).scale(objects[closeIndex]->mat.kr));
 		} else {
 		    return Color(0, 0, 0);
 
+        }
+    }
+
+    Color traceReflection(Ray &ray, int depth, Polygon *original) {
+    	if (depth == 0) {
+    		return Color(0, 0, 0);
+    	}
+    	float min_t = MAXFLOAT;
+    	int closeIndex = 0;
+		for (int i = 0; i < objects.size(); i++) {
+			if (objects[i]->intersects(ray) && objects[i] != original) {
+		        float t = objects[i]->intersectsAt(ray);
+                if (t < min_t) {
+                	min_t = t;
+                	closeIndex = i;
+                }
+		    }
+		}
+		if (min_t != MAXFLOAT) {
+		    vec3 intersection = ray.pos + min_t * ray.vec;
+            vec3 normal = objects[closeIndex]->normalAt(intersection);
+            vec3 reflectionVec = (ray.vec - 2*(ray.vec * normal)*normal);
+            Ray reflected = Ray(intersection, reflectionVec);
+        	return phongShade(ray, objects[closeIndex], normal, intersection).add(traceReflection(reflected, depth-1, objects[closeIndex]).scale(objects[closeIndex]->mat.kr));
+		} else {
+		    return Color(0, 0, 0);
         }
     }
 
@@ -381,27 +415,35 @@ int main(int argc, char* argv[]) {
     vec3 ka = vec3(0.05, 0.05, 0.05);
     vec3 kd = vec3(1, 1, 1);
     vec3 ks = vec3(1, 1, 1);
-    float sp = 10;
-    Material sphereMat = Material(ka, kd, ks, sp);
+    float kr = 0.94f;
+    float sp = 50.0f;
+
+    vec3 ka1 = vec3(0.5, 0.04, 0.15);
+    vec3 kd1 = vec3(1, 1, 1);
+    vec3 ks1 = vec3(1, 1, 1);
+    float kr1 = 0.88f;
+    float sp1 = 45.0f;
+
+    Material sphereMat = Material(ka, kd, ks, kr, sp);
+    Material sphereMat1 = Material(ka1, kd1, ks1, kr1, sp1);
 	
 	vec3 sphereCenter1 = vec3(-5, -5, -10);
-	Sphere sphere1 = Sphere(sphereCenter1, 2, sphereMat);
+	Sphere sphere1 = Sphere(sphereCenter1, 3.0f, sphereMat);
 	scene.addObject(&sphere1);
 	
-	vec3 sphereCenter2 = vec3(0, 0, -5);
-	Sphere sphere2 = Sphere(sphereCenter2, 0.4, sphereMat);
+	vec3 sphereCenter2 = vec3(0, 2, -5);
+	Sphere sphere2 = Sphere(sphereCenter2, 2.0f, sphereMat1);
 	scene.addObject(&sphere2);
 
-    Color lightColor1 = Color(255, 130, 255);
+	vec3 sphereCenter3 = vec3(5, -5, -10);
+	Sphere sphere3 = Sphere(sphereCenter3, 2.0f, sphereMat);
+	scene.addObject(&sphere3);
+
+    Color lightColor1 = Color(122, 130, 20);
     vec3 lightPos1 = vec3(0, 0, -1);
 	Light dl1 = Light(lightColor1, lightPos1, false);
 	scene.addLight(&dl1);
 
-    Color lightColor2 = Color(9, 130, 255);
-    vec3 lightPos2 = vec3(0, 0, 0);
-	Light dl2 = Light(lightColor2, lightPos2, true);
-	//scene.addLight(&dl2);
-	
 	scene.render();
 	scene.writeFile(width, height);
 	
