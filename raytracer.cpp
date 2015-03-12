@@ -73,10 +73,15 @@ public:
 
     vec3 lightVec(vec3 &point) {
         if (pointLight) {
-        	return -(point - pos);
+        	return pos - point;
         } else {
         	return -pos;
         }
+    }
+
+    Ray lightRay(vec3 &point) {
+        vec3 rayVec = lightVec(point).normalize();
+        return Ray(point, rayVec);
     }
 
 };
@@ -182,7 +187,7 @@ public:
     Polygon(){};
     virtual bool intersects(Ray &ray) = 0;
     virtual float intersection(Ray &ray, float eps) = 0;
-    virtual vec3 normalAt(vec3 &point) = 0;
+    virtual vec3 normal(vec3 &point) = 0;
 };
 
 class Sphere : public Polygon {
@@ -197,9 +202,9 @@ public:
 	}
 
 	bool intersects(Ray &ray) {
-		vec3 p_c = ray.pos - center;
-        float discriminant = pow(ray.vec * p_c, 2) - 
-        ((ray.vec * ray.vec) * ((p_c * p_c) - pow(radius, 2)));
+        vec3 p_c = ray.pos - center;
+        vec3 d = ray.vec;
+        float discriminant = pow(d * p_c, 2) - ((d * d) * ((p_c * p_c) - pow(radius, 2)));
 		return discriminant >= 0.0f;
 	}
     
@@ -222,9 +227,8 @@ public:
         }
 	}
 
-    vec3 normalAt(vec3 &point) {
-    	vec3 normal = (point - center) / radius;
-    	//printVec3(normal);
+    vec3 normal(vec3 &point) {
+    	vec3 normal = (point - center).normalize();
     	return normal;
     }
 };
@@ -249,8 +253,8 @@ public:
 	}
 
 	Ray generateRay(Sample &sample) {
-        float u = sample.x / float(width);
-        float v = sample.y / float(height);
+        float u = float(sample.x) / float(width);
+        float v = float(sample.y) / float(height);
         vec3 c = (ll*(1-u) + lr*u)*(1-v) + (ul*(1-u) + ur*u)*v;
         vec3 testRayVec = c - eye;
         testRayVec = testRayVec.normalize();
@@ -266,8 +270,7 @@ public:
 	vector<Polygon*> objects;
 	vector<Light*> lights;
 
-	int width, height;
-	int maxDepth;
+	int width, height, maxDepth;
 	float eps;
 
 	Scene(Camera &_cam, Film &_film, float _eps, int _width, int _height)  {
@@ -275,7 +278,7 @@ public:
 		film = _film;
 		width = _width;
 		height = _height;
-		maxDepth = 4;
+		maxDepth = 2;
 		eps = _eps;
 	}
 
@@ -307,19 +310,17 @@ public:
     	int closeIndex = 0;
 		for (int i = 0; i < objects.size(); i++) {
 			float t = objects[i]->intersection(ray, eps);
-            if (t != MAXFLOAT) {
-                if (t < min_t) {
-                	min_t = t;
-                	closeIndex = i;
-                }
+            if (t != MAXFLOAT && t < min_t) {
+                min_t = t;
+                closeIndex = i;
 		    }
 		}
 		if (min_t != MAXFLOAT) {
 			Polygon *hitObject = objects[closeIndex];
 		    vec3 intersection = ray.pointAt(min_t);
-            vec3 normal = hitObject->normalAt(intersection);
+            vec3 normal = hitObject->normal(intersection);
+            normal.normalize();
             vec3 reflectionVec = (ray.vec - 2*(ray.vec * normal)*normal);
-            reflectionVec.normalize();
             Ray reflected = Ray(intersection, reflectionVec);
             if (depth == 0) {
             	return phongShade(ray, hitObject, normal, intersection);
@@ -345,9 +346,9 @@ public:
     vec3 phongShade(Ray &ray, Polygon *polygon, vec3 &normal, vec3 &point) {
         vec3 total_intensity = vec3(0, 0, 0);
         for (int i = 0; i < lights.size(); i++) {
-        	vec3 intensity = lights[i]->color;
-        	vec3 shadowRayVec = (lights[i]->pos - point).normalize();
-        	Ray shadowRay = Ray(point, shadowRayVec);
+        	Light *light = lights[i];
+        	vec3 intensity = light->color;
+        	Ray shadowRay = light->lightRay(point);
             if (traceShadowRay(shadowRay, polygon)) {
             	continue;
             }
@@ -373,7 +374,7 @@ int main(int argc, char* argv[]) {
 	printf("Ray Tracer!\n");
 	int width = 1000;
 	int height = 1000;
-	float eps = 0.01f;
+	float eps = 0.1f;
 	vec3 eye = vec3(0, 0, 0);
 	vec3 ul = vec3(-1, 1, -1);
 	vec3 ur = vec3(1, 1, -1);
@@ -388,38 +389,38 @@ int main(int argc, char* argv[]) {
     vec3 kd = vec3(1, 1, 1);
     vec3 ks = vec3(1, 1, 1);
     vec3 kr = vec3(0.94, 0.94, 0.94);
-    float sp = 50.0f;
+    float sp = 250.0f;
 
-    vec3 ka1 = vec3(0.5, 0.04, 0.15);
+    vec3 ka1 = vec3(0.05, 0.05, 0.05);
     vec3 kd1 = vec3(1, 1, 1);
     vec3 ks1 = vec3(1, 1, 1);
-    vec3 kr1 = vec3(0.88, 0.88, 0.88);
+    vec3 kr1 = vec3(0.8, 0.8, 0.8);
     float sp1 = 45.0f;
 
     Material sphereMat = Material(ka, kd, ks, kr, sp);
     Material sphereMat1 = Material(ka1, kd1, ks1, kr1, sp1);
 	
-	vec3 sphereCenter1 = vec3(-5, -5, -10);
+	vec3 sphereCenter1 = vec3(0, 0, -10);
 	Sphere sphere1 = Sphere(sphereCenter1, 3.0f, sphereMat);
 	scene.addObject(&sphere1);
 	
-	vec3 sphereCenter2 = vec3(0, 2, -5);
-	Sphere sphere2 = Sphere(sphereCenter2, 2.0f, sphereMat1);
+	vec3 sphereCenter2 = vec3(2, 2, -5);
+    Sphere sphere2 = Sphere(sphereCenter2, 1.0f, sphereMat1);
 	scene.addObject(&sphere2);
 
-	vec3 sphereCenter3 = vec3(5, -5, -10);
-	Sphere sphere3 = Sphere(sphereCenter3, 2.0f, sphereMat);
-	scene.addObject(&sphere3);
+	vec3 sphereCenter3 = vec3(-1, -1, -2);
+	Sphere sphere3 = Sphere(sphereCenter3, 0.8f, sphereMat);
+	//scene.addObject(&sphere3);
 
-    vec3 lightColor1 = vec3(122, 130, 20);
-    vec3 lightPos1 = vec3(1, 1, -1);
+    vec3 lightColor1 = vec3(220, 150, 20);
+    vec3 lightPos1 = vec3(-1, -1, -1);
 	Light dl1 = Light(lightColor1, lightPos1, 0, false);
 	scene.addLight(&dl1);
 
-    vec3 lightColor2 = vec3(40, 130, 250);
-    vec3 lightPos2 = vec3(1, 1, 1);
+    vec3 lightColor2 = vec3(100, 100, 255);
+    vec3 lightPos2 = vec3(-5, 5, -2);
 	Light pl2 = Light(lightColor2, lightPos2, 0, true);
-	//scene.addLight(&pl2);
+	scene.addLight(&pl2);
 
 	scene.render();
 	scene.writeFile(width, height);
