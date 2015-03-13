@@ -5,7 +5,9 @@
 
 #include <vector>
 #include <iostream>
-
+#include <sstream>
+#include <string>
+#include <fstream>
 
 using namespace std;
 void printVec3(vec3 &vec) {
@@ -24,7 +26,7 @@ class Material {
 public:
     vec3 ka, kd, ks, kr;
     float sp;
-    
+
     Material() {
     	ka = vec3(0, 0, 0);
     	kd = vec3(0, 0, 0);
@@ -46,7 +48,7 @@ public:
 	vec3 pos;
 	vec3 vec;
 	float t_min, t_max;
-	
+
 	Ray(vec3 &p, vec3 &v) {
 		pos = p;
 		vec = v;
@@ -169,7 +171,7 @@ public:
         int heightScale = pixHeight / height;
         vector<unsigned char> image;
         int area = pixWidth * pixHeight;
-        
+
         for (int i = 0; i < area; i++) {
         	image.push_back(0);
         	image.push_back(0);
@@ -179,6 +181,7 @@ public:
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
             	int position = 4 * (y * width + x);
+
             	image.at(position)     = film.at((pixHeight - y - 1) * width + x)[RED];
             	image.at(position + 1) = film.at((pixHeight - y - 1) * width + x)[GREEN];
             	image.at(position + 2) = film.at((pixHeight - y - 1) * width + x)[BLUE];
@@ -218,7 +221,7 @@ public:
         float discriminant = pow(d * p_c, 2) - ((d * d) * ((p_c * p_c) - pow(radius, 2)));
 		return discriminant >= 0;
 	}
-    
+
 	float intersection(Ray &ray, float eps) {
 		vec3 p_c = ray.pos - center;
         vec3 d = ray.vec;
@@ -256,7 +259,7 @@ public:
 
 	Camera(){}
 
-	Camera(vec3 &_eye, vec3 &_ul, vec3 &_ur, vec3 &_ll, vec3 &_lr, 
+	Camera(vec3 &_eye, vec3 &_ul, vec3 &_ur, vec3 &_ll, vec3 &_lr,
 	       int _width, int _height) {
 	    eye = _eye;
 		ul = _ul;
@@ -273,7 +276,7 @@ public:
         vec3 c = (ll*(1-u) + lr*u)*(1-v) + (ul*(1-u) + ur*u)*v;
         vec3 testRayVec = c - eye;
         testRayVec = testRayVec.normalize();
-	    return Ray(eye, testRayVec); 
+	    return Ray(eye, testRayVec);
 	}
 };
 
@@ -287,6 +290,8 @@ public:
 
 	int width, height, maxDepth;
 	float eps;
+
+    Scene(){}
 
 	Scene(Camera &_cam, Film &_film, float _eps, int _width, int _height)  {
 		cam = _cam;
@@ -310,6 +315,7 @@ public:
     }
 
     void render() {
+        //cout << "rendering bitch" << endl;
     	Sampler sampler = Sampler(width, height);
     	Sample sample = Sample();
     	while (sampler.generateSample(&sample)) {
@@ -321,6 +327,7 @@ public:
     }
 
     vec3 traceRay(Ray &ray, int depth) {
+        //cout << "tracing yeah" << endl;
     	float min_t = MAXFLOAT;
     	int closeIndex = 0;
 		for (int i = 0; i < objects.size(); i++) {
@@ -378,11 +385,11 @@ public:
             l.normalize();
         	v.normalize();
         	r.normalize();
-            vec3 coeffs = polygon->mat.ka + polygon->mat.kd * MAX(l * normal, 0.0f) 
+            vec3 coeffs = polygon->mat.ka + polygon->mat.kd * MAX(l * normal, 0.0f)
                         + polygon->mat.ks * pow(MAX(r * v, 0.0f), polygon->mat.sp);
             total_intensity += multiplyComponents(intensity, coeffs);
         }
-        return total_intensity; 
+        return total_intensity;
     }
 
 };
@@ -392,59 +399,170 @@ public:
 
 int main(int argc, char* argv[]) {
 	printf("Ray Tracer!\n");
-	int width = 1000;
-	int height = 1000;
-	float eps = 0.1f;
-	vec3 eye = vec3(0, 0, 0);
-	vec3 ul = vec3(-1, 1, -1);
-	vec3 ur = vec3(1, 1, -1);
-	vec3 ll = vec3(-1, -1, -1);
-	vec3 lr = vec3(1, -1, -1);
-	Film film = Film(width, height);
-    Camera cam = Camera(eye, ul, ur, ll, lr, width, height);
-	Scene scene = Scene(cam, film, eps, width, height);
-    
 
-    vec3 ka = vec3(0.1, 0.1, 0.1);
-    vec3 kd = vec3(1, 1, 1);
-    vec3 ks = vec3(1, 1, 1);
-    vec3 kr = vec3(0.5, 0.5, 0.5);
-    float sp = 250.0f;
 
-    vec3 ka1 = vec3(0.1, 0.1, 0.1);
-    vec3 kd1 = vec3(1, 1, 1);
-    vec3 ks1 = vec3(1, 1, 1);
-    vec3 kr1 = vec3(0.5, 0.5, 0.5);
-    float sp1 = 45.0f;
+    float eps = 0.1f;
+    string curline;
+    string argument;
+    Camera pcam;
+    Scene scene = Scene();
+    vec3 eye, ll, lr, ul, ur;
+    vec3 ka = vec3(0,0,0);
+    vec3 kd = vec3(0,0,0);
+    vec3 ks = vec3(0,0,0);
+    vec3 kr = vec3(0,0,0);
+    vector<Sphere> spheres;
+    float sp = 0.0f;
+    int index = 0;
+    Material curMat = Material(ka,kd,ks, kr,sp);
+    int width = 1000;
+    int height = 1000;
+    Film film = Film(width, height);
+    ifstream myfile (argv[1]);
+    if (myfile.is_open()){
+        while (getline (myfile, curline)) {
+            cout << curline << '\n';
+            istringstream iss;
+            iss.str(curline);
+            iss >> argument;
 
-    Material sphereMat = Material(ka, kd, ks, kr, sp);
-    Material sphereMat1 = Material(ka1, kd1, ks1, kr1, sp1);
-	
-	vec3 sphereCenter1 = vec3(0, 0, -10);
-	Sphere sphere1 = Sphere(sphereCenter1, 2.0f, sphereMat);
-	scene.addObject(&sphere1);
-	
-	vec3 sphereCenter2 = vec3(1, -1, -5);
-    Sphere sphere2 = Sphere(sphereCenter2, 1.0f, sphereMat1);
-	scene.addObject(&sphere2);
+            if (curline.empty()){
+                cout << "should get here" << endl;
+                continue;
+            }
+            if (strcmp(argument.c_str(), "cam") == 0){
 
-	vec3 sphereCenter3 = vec3(0, -100, -10);
-	Sphere sphere3 = Sphere(sphereCenter3, 96.0f, sphereMat);
-	scene.addObject(&sphere3);
+                float args[15];
 
-    vec3 lightColor1 = vec3(220, 150, 20);
-    vec3 lightPos1 = vec3(-1, 1, -1);
-	Light dl1 = Light(lightColor1, lightPos1, 0, true);
-	scene.addLight(&dl1);
+                string temp;
+                index = 0;
+                while (iss >> temp){
+                    cout << temp << endl;
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
 
-    vec3 lightColor2 = vec3(100, 100, 255);
-    vec3 lightPos2 = vec3(0, 4, -5);
-	Light pl2 = Light(lightColor2, lightPos2, 0, true);
-	scene.addLight(&pl2);
+                cout << "wow" << endl;
+                cout << "asdijfadsiofjasf" << index << endl;
+                if (index != 15){
+                    cout << "here " << index << endl;
+                    cerr << "incorrect number of arguments for camera"<<endl;
+                }
 
-	scene.render();
-	scene.writeFile(width, height);
-	
+                eye = vec3(args[0], args[1], args[2]);
+                ll = vec3(args[3], args[4], args[5]);
+                lr = vec3(args[6], args[7], args[8]);
+                ul = vec3(args[9], args[10], args[11]);
+                ur = vec3(args[12], args[13], args[14]);
+
+                pcam = Camera(eye, ul, ur, ll, lr, width, height);
+                scene = Scene(pcam, film, eps, width, height);
+            }
+            else if (strcmp(argument.c_str(), "mat") == 0){
+                float args[13];
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    cout << index << endl;
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
+
+                if (index != 13){
+                    cout << index << endl;
+                    cerr << "incorrect number of arguments for material" << endl;
+                }
+                ka = vec3(args[0],args[1],args[2]);
+                kd = vec3(args[3],args[4],args[5]);
+                ks = vec3(args[6],args[7],args[8]);
+                sp = args[9];
+                kr = vec3(args[10],args[11],args[12]);
+                curMat = Material(ka,kd,ks, kr,sp);
+            }
+            else if (strcmp(argument.c_str(), "sph") == 0){
+                float args[4];
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    cout << index << endl;
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
+
+                if (index != 4){
+                    cout << index << endl;
+                    cerr << "incorrect number of arguments for sphere" << endl;
+                }
+                vec3 sphereCenter = vec3(args[0],args[1],args[2]);
+                //should be okay? won't be changing same sphere next time?
+                Sphere sphere = Sphere(sphereCenter, args[3], curMat);
+                spheres.push_back(sphere);
+                //scene.addObject(&sphere);
+            }
+            //same for triangle (TODO)
+            else if (strcmp(argument.c_str(), "ltp") == 0){
+                float args[6];
+                int falloff = 0;
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    cout << index << endl;
+                    if (index == 6){
+                        falloff = atoi(temp.c_str());
+                    }
+                    else{
+                        args[index] = atof(temp.c_str());
+                    }
+                    index++;
+                }
+                if (index > 7 || index < 6){
+                    cout << index << endl;
+                    cerr << "incorrect number of arguments for point light" << endl;
+                }
+                vec3 color = vec3(args[3],args[4],args[5]);
+                vec3 pos = vec3(args[0],args[1],args[2]);
+                Light pl = Light(color, pos, falloff, true);
+                scene.addLight(&pl);
+
+
+            }
+            else if (strcmp(argument.c_str(), "ltd") == 0){
+                float args[6];
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    cout << index << endl;
+                   args[index] = atof(temp.c_str());
+                    index++;
+                }
+                if (index != 6){
+                    cout << index << endl;
+                    cerr << "incorrect number of arguments for directional light" << endl;
+                }
+                vec3 color = vec3(args[3],args[4],args[5]);
+                vec3 pos = vec3(args[0],args[1],args[2]);
+                Light dl = Light(color, pos, 0, false);
+                scene.addLight(&dl);
+            }
+
+        }
+        //cout << "scene.objects: " << scene.objects[0] << endl;
+
+        for (int j = 0; j < spheres.size(); j++){
+
+            scene.addObject(&spheres[j]);
+        }
+        scene.render();
+        scene.writeFile(width, height);
+        myfile.close();
+
+    }
+    else {
+        cerr << "No file! Or bad input path!" << endl;
+        exit(1);
+    }
+
+
 	return 0;
 }
 
