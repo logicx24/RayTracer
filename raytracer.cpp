@@ -63,17 +63,19 @@ class Light {
 public:
     vec3 color;
     vec3 pos;
+    int falloff;
     bool pointLight;
 
-    Light(vec3 &_color, vec3 &_pos, int falloff, bool _pointLight) {
+    Light(vec3 &_color, vec3 &_pos, int _falloff, bool _pointLight) {
     	color = _color;
     	pos = _pos;
+    	falloff = _falloff;
     	pointLight = _pointLight;
     }
 
     vec3 lightVec(vec3 &point) {
         if (pointLight) {
-        	return pos - point;
+        	return (pos - point);
         } else {
         	return -pos;
         }
@@ -82,6 +84,15 @@ public:
     Ray lightRay(vec3 &point) {
         vec3 rayVec = lightVec(point).normalize();
         return Ray(point, rayVec);
+    }
+
+    vec3 intensityAt(vec3 &point) {
+        if (falloff == 0) {
+        	return color;
+        } else {
+        	float d = distance(pos, point);
+            return color / pow(d, falloff);
+        }
     }
 
 };
@@ -168,13 +179,13 @@ public:
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
             	int position = 4 * (y * width + x);
-            	image.at(position)     = film.at(y * width + x)[RED];
-            	image.at(position + 1) = film.at(y * width + x)[GREEN];
-            	image.at(position + 2) = film.at(y * width + x)[BLUE];
+            	image.at(position)     = film.at((pixHeight - y - 1) * width + x)[RED];
+            	image.at(position + 1) = film.at((pixHeight - y - 1) * width + x)[GREEN];
+            	image.at(position + 2) = film.at((pixHeight - y - 1) * width + x)[BLUE];
             	image.at(position + 3) = 255; 
             }
         }
-        unsigned error = lodepng::encode("img.png", image, width, height);
+        unsigned error = lodepng::encode("img.png", image,  width, height);
         if (error) {
         	cout << "lodepng error" << endl;
         }
@@ -205,7 +216,7 @@ public:
         vec3 p_c = ray.pos - center;
         vec3 d = ray.vec;
         float discriminant = pow(d * p_c, 2) - ((d * d) * ((p_c * p_c) - pow(radius, 2)));
-		return discriminant >= 0.0f;
+		return discriminant >= 0;
 	}
     
 	float intersection(Ray &ray, float eps) {
@@ -220,10 +231,14 @@ public:
         if (t1 < eps && t2 < eps) {
         	return MAXFLOAT;
         }
-	    if (t1 > 0) {
-        	return t2;
-        } else {
+        vec3 p1 = ray.pointAt(t1);
+        vec3 p2 = ray.pointAt(t2);
+        float d1 = distance(ray.pos, p1);
+        float d2 = distance(ray.pos, p2);
+	    if (d1 < d2) {
         	return t1;
+        } else {
+        	return t2;
         }
 	}
 
@@ -278,7 +293,7 @@ public:
 		film = _film;
 		width = _width;
 		height = _height;
-		maxDepth = 2;
+		maxDepth = 1;
 		eps = _eps;
 	}
 
@@ -299,8 +314,8 @@ public:
     	Sample sample = Sample();
     	while (sampler.generateSample(&sample)) {
     		Ray testRay = cam.generateRay(sample);
-    		vec3 c = traceRay(testRay, maxDepth);
-    		film.writeToFilm(sample, c);
+    		vec3 color = traceRay(testRay, maxDepth);
+    		film.writeToFilm(sample, color);
     	}
 
     }
@@ -336,8 +351,11 @@ public:
 
     bool traceShadowRay(Ray &ray, Polygon *source) {
         for (int i = 0; i < objects.size(); i++) {
-            if (objects[i]->intersects(ray) && objects[i] != source) {
-            	return true;
+            if (objects[i]->intersects(ray)) {
+                if (objects[i] == source) {
+                	return false;
+                }
+                return true;
             }
         }
         return false;
@@ -347,12 +365,14 @@ public:
         vec3 total_intensity = vec3(0, 0, 0);
         for (int i = 0; i < lights.size(); i++) {
         	Light *light = lights[i];
-        	vec3 intensity = light->color;
+        	vec3 intensity = light->intensityAt(point);
         	Ray shadowRay = light->lightRay(point);
             if (traceShadowRay(shadowRay, polygon)) {
-            	continue;
+            	//cout << "HALLO" << endl;
+                continue;
+
             }
-        	vec3 l = lights[i]->lightVec(point);
+        	vec3 l = light->lightVec(point);
             vec3 v = -ray.vec;
             vec3 r = -l + ((2*(l * normal)) * normal);
             l.normalize();
@@ -385,13 +405,13 @@ int main(int argc, char* argv[]) {
 	Scene scene = Scene(cam, film, eps, width, height);
     
 
-    vec3 ka = vec3(0.05, 0.05, 0.05);
+    vec3 ka = vec3(0.1, 0.1, 0.1);
     vec3 kd = vec3(1, 1, 1);
     vec3 ks = vec3(1, 1, 1);
     vec3 kr = vec3(0.94, 0.94, 0.94);
     float sp = 250.0f;
 
-    vec3 ka1 = vec3(0.05, 0.05, 0.05);
+    vec3 ka1 = vec3(0.1, 0.1, 0.1);
     vec3 kd1 = vec3(1, 1, 1);
     vec3 ks1 = vec3(1, 1, 1);
     vec3 kr1 = vec3(0.8, 0.8, 0.8);
@@ -404,21 +424,21 @@ int main(int argc, char* argv[]) {
 	Sphere sphere1 = Sphere(sphereCenter1, 3.0f, sphereMat);
 	scene.addObject(&sphere1);
 	
-	vec3 sphereCenter2 = vec3(2, 2, -5);
+	vec3 sphereCenter2 = vec3(1, -1, -5);
     Sphere sphere2 = Sphere(sphereCenter2, 1.0f, sphereMat1);
 	scene.addObject(&sphere2);
 
-	vec3 sphereCenter3 = vec3(-1, -1, -2);
-	Sphere sphere3 = Sphere(sphereCenter3, 0.8f, sphereMat);
-	//scene.addObject(&sphere3);
+	vec3 sphereCenter3 = vec3(0, -100, -10);
+	Sphere sphere3 = Sphere(sphereCenter3, 96.0f, sphereMat);
+	scene.addObject(&sphere3);
 
     vec3 lightColor1 = vec3(220, 150, 20);
-    vec3 lightPos1 = vec3(-1, -1, -1);
+    vec3 lightPos1 = vec3(-2, 1, -2);
 	Light dl1 = Light(lightColor1, lightPos1, 0, false);
-	scene.addLight(&dl1);
+	//scene.addLight(&dl1);
 
     vec3 lightColor2 = vec3(100, 100, 255);
-    vec3 lightPos2 = vec3(-5, 5, -2);
+    vec3 lightPos2 = vec3(0, 4, -5);
 	Light pl2 = Light(lightColor2, lightPos2, 0, true);
 	scene.addLight(&pl2);
 
