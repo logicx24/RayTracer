@@ -293,7 +293,7 @@ public:
 		film = _film;
 		width = _width;
 		height = _height;
-		maxDepth = 1;
+		maxDepth = 3;
 		eps = _eps;
 	}
 
@@ -408,20 +408,20 @@ int main(int argc, char* argv[]) {
     vec3 ka = vec3(0.1, 0.1, 0.1);
     vec3 kd = vec3(1, 1, 1);
     vec3 ks = vec3(1, 1, 1);
-    vec3 kr = vec3(0.94, 0.94, 0.94);
+    vec3 kr = vec3(0.5, 0.5, 0.5);
     float sp = 250.0f;
 
     vec3 ka1 = vec3(0.1, 0.1, 0.1);
     vec3 kd1 = vec3(1, 1, 1);
     vec3 ks1 = vec3(1, 1, 1);
-    vec3 kr1 = vec3(0.8, 0.8, 0.8);
+    vec3 kr1 = vec3(0.5, 0.5, 0.5);
     float sp1 = 45.0f;
 
     Material sphereMat = Material(ka, kd, ks, kr, sp);
     Material sphereMat1 = Material(ka1, kd1, ks1, kr1, sp1);
 	
 	vec3 sphereCenter1 = vec3(0, 0, -10);
-	Sphere sphere1 = Sphere(sphereCenter1, 3.0f, sphereMat);
+	Sphere sphere1 = Sphere(sphereCenter1, 2.0f, sphereMat);
 	scene.addObject(&sphere1);
 	
 	vec3 sphereCenter2 = vec3(1, -1, -5);
@@ -433,9 +433,9 @@ int main(int argc, char* argv[]) {
 	scene.addObject(&sphere3);
 
     vec3 lightColor1 = vec3(220, 150, 20);
-    vec3 lightPos1 = vec3(-2, 1, -2);
-	Light dl1 = Light(lightColor1, lightPos1, 0, false);
-	//scene.addLight(&dl1);
+    vec3 lightPos1 = vec3(-1, 1, -1);
+	Light dl1 = Light(lightColor1, lightPos1, 0, true);
+	scene.addLight(&dl1);
 
     vec3 lightColor2 = vec3(100, 100, 255);
     vec3 lightPos2 = vec3(0, 4, -5);
