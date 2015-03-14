@@ -225,48 +225,53 @@ public:
     }
 
     bool intersects(Ray &ray) {
-        vec3 normal = edge1 ^ edge2; 
-        vec3 w0 = ray.pos - vertex1;
-        float a = -(normal * w0);
-        //float b = w0 * ray.vec;
-        float b = normal * ray.vec;
+        // vec3 normal = edge1 ^ edge2; 
+        // vec3 w0 = ray.pos - vertex1;
+        // float a = -(normal * w0);
+        // //float b = w0 * ray.vec;
+        // float b = normal * ray.vec;
 
-        if (fabs(b) < 0.1f) {
-            if (a == 0.0f) {
-                return true;
-            }
-            return false;
-        }
+        // if (fabs(b) < 0.1f) {
+        //     if (a == 0.0f) {
+        //         return true;
+        //     }
+        //     return false;
+        // }
 
-        float r = a/b;
+        // float r = a/b;
 
-        if (r < 0.0f) {
-            return false;
-        }
+        // if (r < 0.0f) {
+        //     return false;
+        // }
 
-        vec3 intersect = ray.pointAt(r);
-        float uu, uv, vv, wu, wv, D;
+        // vec3 intersect = ray.pointAt(r);
+        // float uu, uv, vv, wu, wv, D;
 
-        uu = edge1 * edge1;
-        uv = edge1 * edge2;
-        vv = edge2 * edge2;
-        vec3 w = intersect - vertex1;
-        wu = w * edge1;
-        wv = w * edge2;
-        D = uv * uv - uu * vv;
+        // uu = edge1 * edge1;
+        // uv = edge1 * edge2;
+        // vv = edge2 * edge2;
+        // vec3 w = intersect - vertex1;
+        // wu = w * edge1;
+        // wv = w * edge2;
+        // D = uv * uv - uu * vv;
 
-        float s, t;
+        // float s, t;
 
-        s = (uv * wv - vv * wu) / D;
-        if (s < 0.0f || s > 1.0f) {
-            return false;
-        }
-        t = (uv * wu - uu * wv) / D;
-        if (t < 0.0f || (s + t) > 1.0f) {
-            return false;
-        }
+        // s = (uv * wv - vv * wu) / D;
+        // if (s < 0.0f || s > 1.0f) {
+        //     return false;
+        // }
+        // t = (uv * wu - uu * wv) / D;
+        // if (t < 0.0f || (s + t) > 1.0f) {
+        //     return false;
+        // }
 
-        return true;
+        // if (r < 0.1f) {
+        //     return false;
+        // }
+
+        // return true;
+        return intersection(ray, 0.1f) != MAXFLOAT;
 
     }
 
@@ -334,11 +339,12 @@ public:
 	}
 
 	bool intersects(Ray &ray) {
-        vec3 p_c = ray.pos - center;
-        vec3 d = ray.vec;
-        float discriminant = pow(d * p_c, 2) - ((d * d) * ((p_c * p_c) - pow(radius, 2)));
-		return discriminant >= 0;
-	}
+        // vec3 p_c = ray.pos - center;
+        // vec3 d = ray.vec;
+        // float discriminant = pow(d * p_c, 2) - ((d * d) * ((p_c * p_c) - pow(radius, 2)));
+		//return discriminant >= 0 && intersection(ray, 0.1f) != MAXFLOAT;
+	   return intersection(ray, 0.1f) != MAXFLOAT;
+    }  
 
 	float intersection(Ray &ray, float eps) {
 		vec3 p_c = ray.pos - center;
@@ -481,7 +487,7 @@ public:
                 if (objects[i] == source) {
                     continue;
                 }
-                if (objects[i] != source) {
+                else if (objects[i] != source) {
                 	return true;
                 }
             }
@@ -496,7 +502,6 @@ public:
         	vec3 intensity = light->intensityAt(point);
         	Ray shadowRay = light->lightRay(point);
             if (traceShadowRay(shadowRay, polygon)) {
-            	//cout << "HALLO" << endl;
                 continue;
             }
         	vec3 l = light->lightVec(point);
@@ -750,13 +755,13 @@ int main(int argc, char* argv[]) {
 
     vec3 sphereCenter3 = vec3(-2, -2, -15);
     Sphere sphere3 = Sphere(sphereCenter3, 1.0f, sphereMat2);
-    //scene.addObject(&sphere3);
+    scene.addObject(&sphere3);
 
     vec3 v1 = vec3(5, 5, -17);
     vec3 v2 = vec3(1, 4, -20);
     vec3 v3 = vec3(6, -1, -20);
     Triangle triangle = Triangle(v1, v2, v3, triMat);
-    //scene.addObject(&triangle);
+    scene.addObject(&triangle);
 
     vec3 lightColor1 = vec3(255, 255, 255);
     vec3 lightPos1 = vec3(0.57735027f, -0.57735027f, -0.57735027f);
