@@ -1,3 +1,17 @@
+/*********************************************
+ ____             _                           
+|  _ \ __ _ _   _| |_ _ __ __ _  ___ ___ _ __ 
+| |_) / _` | | | | __| '__/ _` |/ __/ _ \ '__|
+|  _ < (_| | |_| | |_| | | (_| | (_|  __/ |   
+|_| \_\__,_|\__, |\__|_|  \__,_|\___\___|_|   
+            |___/    
+
+Aakash Japi
+Jonathan Tau
+Gabriel Intrator
+*********************************************/
+
+
 #include <stdio.h>
 #include <math.h>
 #include "lodepng.h"
@@ -10,6 +24,7 @@
 #include <fstream>
 
 using namespace std;
+
 void printVec3(vec3 &vec) {
 	cout << "x: " << vec[VX] << " y: " << vec[VY] << " Z: " << vec[VZ] << endl;
 }
@@ -45,8 +60,7 @@ public:
 };
 class Ray {
 public:
-	vec3 pos;
-	vec3 vec;
+	vec3 pos, vec;
 	float t_min, t_max;
 
 	Ray(vec3 &p, vec3 &v) {
@@ -63,8 +77,7 @@ public:
 
 class Light {
 public:
-    vec3 color;
-    vec3 pos;
+    vec3 color, pos;
     int falloff;
     bool pointLight;
 
@@ -112,8 +125,7 @@ public:
 
 class Sampler {
 public:
-    int width, height;
-    int x, y;
+    int width, height, x, y;
 
     Sampler(int _width, int _height) {
     	width = _width;
@@ -191,7 +203,7 @@ public:
         }
         unsigned error = lodepng::encode("img.png", image,  width, height);
         if (error) {
-        	cout << "lodepng error" << endl;
+        	cout << "lodepng error." << endl;
         }
     }
 };
@@ -207,19 +219,13 @@ public:
 
 class Triangle : public Polygon {
 public:
-    vec3 vertex1;
-    vec3 vertex2;
-    vec3 vertex3;
-
-    vec3 edge1;
-    vec3 edge2;
+    vec3 vertex1, vertex2, vertex3, edge1, edge2;
 
     Triangle(vec3 &_v1, vec3 &_v2, vec3 &_v3, Material &_mat) {
         vertex1 = _v1;
         vertex2 = _v2;
         vertex3 = _v3;
         mat = _mat;
-
         edge1 = vertex2 - vertex1;
         edge2 = vertex3 - vertex1;
     }
@@ -285,8 +291,9 @@ public:
         if (fabs(b) < eps) {
             if (a == 0.0f) {
                 return r;
+            } else {
+            	return MAXFLOAT;
             }
-            return MAXFLOAT;
         }
 
         if (r < 0.0f) {
@@ -483,13 +490,8 @@ public:
 
     bool traceShadowRay(Ray &ray, Polygon *source) {
         for (int i = 0; i < objects.size(); i++) {
-            if (objects[i]->intersects(ray)) {
-                if (objects[i] == source) {
-                    continue;
-                }
-                else if (objects[i] != source) {
-                	return true;
-                }
+            if (objects[i]->intersects(ray) && objects[i] != source) {
+                return true;
             }
         }
         return false;
@@ -520,190 +522,190 @@ public:
 };
 
 
+
 int main(int argc, char* argv[]) {
     printf("Ray Tracer!\n");
-    // float eps = 0.05f;
-    // string curline;
-    // string argument;
-    // Camera pcam;
-    // Scene scene = Scene();
-    // vec3 eye, ll, lr, ul, ur;
-    // vec3 ka = vec3(0,0,0);
-    // vec3 kd = vec3(0,0,0);
-    // vec3 ks = vec3(0,0,0);
-    // vec3 kr = vec3(0,0,0);
-    // vector<Sphere> spheres;
-    // vector<Triangle> triangles;
-    // float sp = 0.0f;
-    // int index = 0;
-    // Material curMat = Material(ka,kd,ks, kr,sp);
-    // int width = 1000;
-    // int height = 1000;
-    // Film film = Film(width, height);
-    // ifstream myfile (argv[1]);
-    // if (myfile.is_open()){
-    //     while (getline (myfile, curline)) {
-    //         cout << curline << '\n';
-    //         istringstream iss;
-    //         iss.str(curline);
-    //         iss >> argument;
+    float eps = 0.1f;
+    int width = 1000;
+    int height = 1000;
+    float sp;
+    vec3 eye, ll, lr, ul, ur, ka, kd, ks, kr;
+    
+    Film film = Film(width, height);
+    Camera pcam;
+    Scene scene;
+    
+    Material curMat;
+    vector<Polygon*> sceneObjects;
+    vector<Light*> sceneLights;
 
-    //         if (curline.empty()){
-    //             continue;
-    //         }
-    //         if (strcmp(argument.c_str(), "cam") == 0){
+    int index = 0;
+    string argument;
+    string curline;
+    ifstream myfile (argv[1]);
+    if (myfile.is_open()){
+        while (getline (myfile, curline)) {
+            //cout << curline << '\n';
+            istringstream iss;
+            iss.str(curline);
+            iss >> argument;
 
-    //             float args[15];
+            if (curline.empty()){
+                continue;
+            }
+            if (strcmp(argument.c_str(), "cam") == 0){
 
-    //             string temp;
-    //             index = 0;
-    //             while (iss >> temp){
-    //                 cout << temp << endl;
-    //                 args[index] = atof(temp.c_str());
-    //                 index++;
-    //             }
+                float args[15];
 
-    //             if (index != 15){
-    //                 cerr << "incorrect number of arguments for camera"<<endl;
-    //             }
+                string temp;
+                index = 0;
+                while (iss >> temp){
+                    // cout << temp << endl;
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
 
-    //             eye = vec3(args[0], args[1], args[2]);
-    //             ll = vec3(args[3], args[4], args[5]);
-    //             lr = vec3(args[6], args[7], args[8]);
-    //             ul = vec3(args[9], args[10], args[11]);
-    //             ur = vec3(args[12], args[13], args[14]);
+                if (index != 15){
+                    cerr << "Incorrect number of arguments for camera." << endl;
+                }
 
-    //             pcam = Camera(eye, ul, ur, ll, lr, width, height);
-    //             scene = Scene(pcam, film, eps, width, height);
-    //         }
-    //         else if (strcmp(argument.c_str(), "mat") == 0){
-    //             float args[13];
-    //             string temp;
-    //             int index = 0;
-    //             while (iss >> temp){
-    //                 cout << index << endl;
-    //                 args[index] = atof(temp.c_str());
-    //                 index++;
-    //             }
+                eye = vec3(args[0], args[1], args[2]);
+                ll = vec3(args[3], args[4], args[5]);
+                lr = vec3(args[6], args[7], args[8]);
+                ul = vec3(args[9], args[10], args[11]);
+                ur = vec3(args[12], args[13], args[14]);
 
-    //             if (index != 13){
-    //                 cout << index << endl;
-    //                 cerr << "incorrect number of arguments for material" << endl;
-    //             }
-    //             ka = vec3(args[0],args[1],args[2]);
-    //             kd = vec3(args[3],args[4],args[5]);
-    //             ks = vec3(args[6],args[7],args[8]);
-    //             sp = args[9];
-    //             kr = vec3(args[10],args[11],args[12]);
-    //             curMat = Material(ka,kd,ks, kr,sp);
-    //         }
-    //         else if (strcmp(argument.c_str(), "sph") == 0){
-    //             float args[4];
-    //             string temp;
-    //             int index = 0;
-    //             while (iss >> temp){
-    //                 cout << index << endl;
-    //                 args[index] = atof(temp.c_str());
-    //                 index++;
-    //             }
+                pcam = Camera(eye, ul, ur, ll, lr, width, height);
+                scene = Scene(pcam, film, eps, width, height);
+            
+            } else if (strcmp(argument.c_str(), "mat") == 0){
+                float args[13];
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    // cout << index << endl;
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
 
-    //             if (index != 4){
-    //                 cout << index << endl;
-    //                 cerr << "incorrect number of arguments for sphere" << endl;
-    //             }
-    //             vec3 sphereCenter = vec3(args[0],args[1],args[2]);
-    //             //should be okay? won't be changing same sphere next time?
-    //             Sphere sphere = Sphere(sphereCenter, args[3], curMat);
-    //             spheres.push_back(sphere);
-    //             //scene.addObject(&sphere);
-    //         }
+                if (index != 13){
+                    // cout << index << endl;
+                    cerr << "Incorrect number of arguments for material." << endl;
+                }
+                ka = vec3(args[0],args[1],args[2]);
+                kd = vec3(args[3],args[4],args[5]);
+                ks = vec3(args[6],args[7],args[8]);
+                sp = args[9];
+                kr = vec3(args[10],args[11],args[12]);
+                curMat = Material(ka,kd,ks, kr,sp);
+            
+            } else if (strcmp(argument.c_str(), "sph") == 0){
+                float args[4];
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    //cout << index << endl;
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
 
-    //         else if (strcmp(argument.c_str(), "tri") == 0) {
-    //             float args[9];
-    //             string temp;
-    //             int index = 0;
-    //             while (iss >> temp){
-    //                 cout << index << endl;
-    //                 args[index] = atof(temp.c_str());
-    //                 index++;
-    //             }
+                if (index != 4){
+                    // cout << index << endl;
+                    cerr << "Incorrect number of arguments for sphere." << endl;
+                }
+                vec3 sphereCenter = vec3(args[0],args[1],args[2]);
+                sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat));
+            
+            } else if (strcmp(argument.c_str(), "tri") == 0) {
+                float args[9];
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    // cout << index << endl;
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
 
-    //             if (index != 9){
-    //                 cout << index << endl;
-    //                 cerr << "incorrect number of arguments for triangle" << endl;
-    //             }
-    //             vec3 v1 = vec3(args[0],args[1],args[2]);
-    //             vec3 v2 = vec3(args[3],args[4],args[5]);
-    //             vec3 v3 = vec3(args[6],args[7],args[8]);
+                if (index != 9){
+                    // cout << index << endl;
+                    cerr << "Incorrect number of arguments for triangle." << endl;
+                }
+                vec3 v1 = vec3(args[0],args[1],args[2]);
+                vec3 v2 = vec3(args[3],args[4],args[5]);
+                vec3 v3 = vec3(args[6],args[7],args[8]);
 
-    //             //should be okay? won't be changing same sphere next time?
-    //             Triangle triangle = Triangle(v1, v2, v3, curMat);
-    //             triangles.push_back(triangle);
-    //         }
+                sceneObjects.push_back(new Triangle(v1, v2, v3, curMat));
+            
+            } else if (strcmp(argument.c_str(), "ltp") == 0){
+                float args[6];
+                int falloff = 0;
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    // cout << index << endl;
+                    if (index == 6){
+                        falloff = atoi(temp.c_str());
+                    }
+                    else{
+                        args[index] = atof(temp.c_str());
+                    }
+                    index++;
+                }
+                if (index > 7 || index < 6){
+                    // cout << index << endl;
+                    cerr << "Incorrect number of arguments for point light." << endl;
+                }
+                vec3 color = vec3(args[3],args[4],args[5]);
+                vec3 pos = vec3(args[0],args[1],args[2]);
+                sceneLights.push_back(new Light(color, pos, falloff, true));
 
-    //         else if (strcmp(argument.c_str(), "ltp") == 0){
-    //             float args[6];
-    //             int falloff = 0;
-    //             string temp;
-    //             int index = 0;
-    //             while (iss >> temp){
-    //                 cout << index << endl;
-    //                 if (index == 6){
-    //                     falloff = atoi(temp.c_str());
-    //                 }
-    //                 else{
-    //                     args[index] = atof(temp.c_str());
-    //                 }
-    //                 index++;
-    //             }
-    //             if (index > 7 || index < 6){
-    //                 cout << index << endl;
-    //                 cerr << "incorrect number of arguments for point light" << endl;
-    //             }
-    //             vec3 color = vec3(args[3],args[4],args[5]);
-    //             vec3 pos = vec3(args[0],args[1],args[2]);
-    //             Light pl = Light(color, pos, falloff, true);
-    //             scene.addLight(&pl);
+            } else if (strcmp(argument.c_str(), "ltd") == 0){
+                float args[6];
+                string temp;
+                int index = 0;
+                while (iss >> temp){
+                    // cout << index << endl;
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
+                if (index != 6){
+                    // cout << index << endl;
+                    cerr << "Incorrect number of arguments for directional light." << endl;
+                }
+                vec3 color = vec3(args[3],args[4],args[5]);
+                vec3 pos = vec3(args[0],args[1],args[2]);
+                sceneLights.push_back(new Light(color, pos, 0, false));
+            }
 
+        }
 
-    //         }
-    //         else if (strcmp(argument.c_str(), "ltd") == 0){
-    //             float args[6];
-    //             string temp;
-    //             int index = 0;
-    //             while (iss >> temp){
-    //                 cout << index << endl;
-    //                args[index] = atof(temp.c_str());
-    //                 index++;
-    //             }
-    //             if (index != 6){
-    //                 cout << index << endl;
-    //                 cerr << "incorrect number of arguments for directional light" << endl;
-    //             }
-    //             vec3 color = vec3(args[3],args[4],args[5]);
-    //             vec3 pos = vec3(args[0],args[1],args[2]);
-    //             Light dl = Light(color, pos, 0, false);
-    //             scene.addLight(&dl);
-    //         }
+        for (int i = 0; i < sceneObjects.size(); i++){
+            scene.addObject(sceneObjects[i]);
+        }
+        for (int i = 0; i < sceneLights.size(); i++){
+            scene.addLight(sceneLights[i]);
+        }
+        
+        myfile.close();
 
-    //     }
+    }
+    else {
+        cerr << "No file! Or bad input path!" << endl;
+        exit(0);
+    }
 
-    //     for (int j = 0; j < spheres.size(); j++){
-    //         scene.addObject(&spheres[j]);
-    //     }
-    //     for (int j = 0; j < triangles.size(); j++){
-    //         scene.addObject(&triangles[j]);
-    //     }
-    //     scene.render();
-    //     scene.writeFile(width, height);
-    //     myfile.close();
+    cout << "Beginning scene render." << endl;
 
-    // }
-    // else {
-    //     cerr << "No file! Or bad input path!" << endl;
-    //     exit(1);
-    // }
-    // printf("Ray Tracer!\n");
+    scene.render();
+    
+    cout << "Scene render completed." << endl;
+    cout << "Writing to file..." << endl;
+
+    scene.writeFile(width, height);
+    
+    cout << "Image saved." << endl;
+
+    /*
     int width = 500;
     int height = 500;
     float eps = 0.05f;
@@ -775,6 +777,7 @@ int main(int argc, char* argv[]) {
 
     scene.render();
     scene.writeFile(width, height);
+    */
         
 	return 0;
 }
