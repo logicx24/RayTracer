@@ -37,6 +37,10 @@ vec3 multiplyComponents(vec3 v1, vec3 v2) {
 	return vec3(v1[VX] * v2[VX], v1[VY] * v2[VY], v1[VZ] * v2[VZ]);
 }
 
+float magnitude(vec3 v1) {
+	return sqrt(v1[VX] * v1[VX] + v1[VY] * v1[VY] + v1[VZ] * v1[VZ]);
+}
+
 class Material {
 public:
     vec3 ka, kd, ks, kr;
@@ -473,7 +477,7 @@ public:
 		    vec3 intersection = ray.pointAt(min_t);
             vec3 normal = hitObject->normal(intersection);
             normal.normalize();
-            vec3 reflectionVec = (ray.vec - 2*(ray.vec * normal)*normal);
+            vec3 reflectionVec = ray.vec - (2*(ray.vec * normal))*normal; 
             reflectionVec.normalize();
             Ray reflected = Ray(intersection, reflectionVec);
             if (depth == 0) {
@@ -521,11 +525,58 @@ public:
 
 };
 
-
+void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat) {
+	cout << fileName << endl;
+	vector<vec3> verts;
+	verts.push_back(vec3(0, 0, 0)); // Kill index 0, since vertices are numbered 1 ... n
+	ifstream objFile(fileName);
+	string currentLine;
+	string argument;
+    if (!objFile.is_open()) {
+    	cerr << "Error opening obj file" << endl;
+    	return;
+    }
+    while (getline(objFile, currentLine)) {
+    	istringstream iss;
+    	iss.str(currentLine);
+    	iss >> argument;
+        if (currentLine.empty()) {
+        	continue;
+        }
+        if (strcmp(argument.c_str(), "v") == 0) {
+        	//cout << "found vertice" << endl;
+        	float args[3];
+            int index = 0;
+            string temp;
+            while (iss >> temp) {
+            	args[index] = atof(temp.c_str());
+            	index++;
+            }
+            if (index != 3) {
+            	cerr << "Incorrect number of arguments for vertex in obj file." << endl;
+            }
+            verts.push_back(vec3(args[0], args[1], args[2]));
+        } else if (strcmp(argument.c_str(), "f") == 0) {
+        	int args[3];
+        	int index = 0;
+        	string temp;
+            while (iss >> temp) {
+            	args[index] = atoi(temp.c_str());
+            	index++;
+            }
+            if (index != 3) {
+            	cerr << "More than 3 vertices specified for face, only using first 3." << endl;
+            }
+            Triangle *t = new Triangle(verts[args[0]], verts[args[1]], verts[args[2]], curMat);
+            sceneObjects->push_back(t);
+        }
+    }
+    objFile.close();
+}
 
 int main(int argc, char* argv[]) {
     printf("Ray Tracer!\n");
-    float eps = 0.1f;
+    float eps = 0.05f;
     int width = 1000;
     int height = 1000;
     float sp;
@@ -538,6 +589,7 @@ int main(int argc, char* argv[]) {
     Material curMat;
     vector<Polygon*> sceneObjects;
     vector<Light*> sceneLights;
+    vector<vec3> vertices;
 
     int index = 0;
     string argument;
@@ -675,14 +727,18 @@ int main(int argc, char* argv[]) {
                 vec3 color = vec3(args[3],args[4],args[5]);
                 vec3 pos = vec3(args[0],args[1],args[2]);
                 sceneLights.push_back(new Light(color, pos, 0, false));
+            } else if (strcmp(argument.c_str(), "obj") == 0) {
+                string temp;
+                iss >> temp;
+                parseObj(temp.c_str(), &sceneObjects, curMat);
             }
 
-        }
+        } 
 
         for (int i = 0; i < sceneObjects.size(); i++){
             scene.addObject(sceneObjects[i]);
         }
-        for (int i = 0; i < sceneLights.size(); i++){
+        for (int i = 0; i < sceneLights.size(); i++) {
             scene.addLight(sceneLights[i]);
         }
         
@@ -694,7 +750,7 @@ int main(int argc, char* argv[]) {
         exit(0);
     }
 
-    cout << "Beginning scene render." << endl;
+    cout << "Rendering Scene..." << endl;
 
     scene.render();
     
