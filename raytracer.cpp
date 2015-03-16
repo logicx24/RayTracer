@@ -30,7 +30,7 @@ void printVec3(vec3 &vec) {
 }
 
 float distance(vec3 &p1, vec3 &p2) {
-	return sqrt(p1[VX]*p2[VX] + p1[VY]*p2[VY] + p1[VZ]*p2[VZ]);
+	return sqrt(pow(p1[VX] - p2[VX], 2) + pow(p1[VY] - p2[VY], 2) + pow(p1[VZ] - p2[VZ], 2));
 }
 
 vec3 multiplyComponents(vec3 v1, vec3 v2) {
@@ -85,11 +85,20 @@ public:
     int falloff;
     bool pointLight;
 
+    Light(){}
+
     Light(vec3 &_color, vec3 &_pos, int _falloff, bool _pointLight) {
     	color = _color;
     	pos = _pos;
     	falloff = _falloff;
     	pointLight = _pointLight;
+    }
+
+    Light(vec3 &ambientColor) {
+    	color = ambientColor;
+    	pos = vec3(0, 0, 0);
+    	falloff = 0;
+    	pointLight = false;
     }
 
     vec3 lightVec(vec3 &point) {
@@ -155,6 +164,12 @@ public:
 
 };
 
+vec3 floatToByte(vec3 &fcolor) {
+	return vec3((int)(fcolor[RED] * 255.0f), 
+	            (int)(fcolor[GREEN] * 255.0f), 
+	            (int)(fcolor[BLUE] * 255.0f));
+}
+
 class Film {
 public:
     int width, height;
@@ -170,7 +185,8 @@ public:
         }
     }
 
-    void writeToFilm(Sample &sample, vec3 &color) {
+    void writeToFilm(Sample &sample, vec3 &fColor) {
+    	vec3 color = floatToByte(fColor);
     	if (color[RED] > 255) {color[RED] = 255;}
     	if (color[GREEN] > 255) {color[GREEN] = 255;}
     	if (color[BLUE] > 255) {color[BLUE] = 255;}
@@ -230,63 +246,17 @@ public:
         vertex2 = _v2;
         vertex3 = _v3;
         mat = _mat;
-        edge1 = vertex2 - vertex1;
-        edge2 = vertex3 - vertex1;
+        edge1 = vertex3 - vertex1;
+        edge2 = vertex2 - vertex1;
     }
 
     bool intersects(Ray &ray) {
-        // vec3 normal = edge1 ^ edge2; 
-        // vec3 w0 = ray.pos - vertex1;
-        // float a = -(normal * w0);
-        // //float b = w0 * ray.vec;
-        // float b = normal * ray.vec;
-
-        // if (fabs(b) < 0.1f) {
-        //     if (a == 0.0f) {
-        //         return true;
-        //     }
-        //     return false;
-        // }
-
-        // float r = a/b;
-
-        // if (r < 0.0f) {
-        //     return false;
-        // }
-
-        // vec3 intersect = ray.pointAt(r);
-        // float uu, uv, vv, wu, wv, D;
-
-        // uu = edge1 * edge1;
-        // uv = edge1 * edge2;
-        // vv = edge2 * edge2;
-        // vec3 w = intersect - vertex1;
-        // wu = w * edge1;
-        // wv = w * edge2;
-        // D = uv * uv - uu * vv;
-
-        // float s, t;
-
-        // s = (uv * wv - vv * wu) / D;
-        // if (s < 0.0f || s > 1.0f) {
-        //     return false;
-        // }
-        // t = (uv * wu - uu * wv) / D;
-        // if (t < 0.0f || (s + t) > 1.0f) {
-        //     return false;
-        // }
-
-        // if (r < 0.1f) {
-        //     return false;
-        // }
-
-        // return true;
         return intersection(ray, 0.1f) != MAXFLOAT;
 
     }
 
     float intersection(Ray &ray, float eps) {
-        vec3 normal = edge1 ^ edge2; 
+        vec3 normal = (edge2 ^ edge1).normalize(); 
         vec3 w0 = ray.pos - vertex1;
         float a = -(normal * w0);
         float b = normal * ray.vec;
@@ -333,7 +303,7 @@ public:
     }
 
     vec3 normal(vec3 &point) {
-        vec3 normal = (edge1 ^ edge2);
+        vec3 normal = (edge2 ^ edge1);
         return normal;
     }
 };
@@ -350,10 +320,6 @@ public:
 	}
 
 	bool intersects(Ray &ray) {
-        // vec3 p_c = ray.pos - center;
-        // vec3 d = ray.vec;
-        // float discriminant = pow(d * p_c, 2) - ((d * d) * ((p_c * p_c) - pow(radius, 2)));
-		//return discriminant >= 0 && intersection(ray, 0.1f) != MAXFLOAT;
 	   return intersection(ray, 0.1f) != MAXFLOAT;
     }  
 
@@ -422,6 +388,7 @@ public:
 	Film film;
 	vector<Polygon*> objects;
 	vector<Light*> lights;
+	Light ambientLight;
 
 	int width, height, maxDepth;
 	float eps;
@@ -431,9 +398,11 @@ public:
 	Scene(Camera &_cam, Film &_film, float _eps, int _width, int _height)  {
 		cam = _cam;
 		film = _film;
+		vec3 defaultAmbientColor = vec3(0, 0, 0);
+		Light ambientLight = Light(defaultAmbientColor);
 		width = _width;
 		height = _height;
-		maxDepth = 1;
+		maxDepth = 3;
 		eps = _eps;
 	}
 
@@ -443,6 +412,10 @@ public:
 
     void addLight(Light *l) {
     	lights.push_back(l);
+    }
+
+    void addAmbientLight(Light &l) {
+    	ambientLight = l;
     }
 
     void writeFile(int pixWidth, int pixHeight) {
@@ -484,7 +457,7 @@ public:
             	return phongShade(ray, hitObject, normal, intersection);
             } else {
         	    return phongShade(ray, hitObject, normal, intersection)
-        	       + multiplyComponents(traceRay(reflected, depth - 1), hitObject->mat.kr);
+        	           + multiplyComponents(traceRay(reflected, depth - 1), hitObject->mat.kr);
 		    }
 		} else {
 		    return vec3(0, 0, 0);
@@ -503,6 +476,7 @@ public:
 
     vec3 phongShade(Ray &ray, Polygon *polygon, vec3 &normal, vec3 &point) {
         vec3 total_intensity = vec3(0, 0, 0);
+        total_intensity += multiplyComponents(ambientLight.color, polygon->mat.ka);
         for (int i = 0; i < lights.size(); i++) {
         	Light *light = lights[i];
         	vec3 intensity = light->intensityAt(point);
@@ -516,7 +490,7 @@ public:
             l.normalize();
         	v.normalize();
         	r.normalize();
-            vec3 coeffs = polygon->mat.ka + polygon->mat.kd * MAX(l * normal, 0.0f)
+            vec3 coeffs = polygon->mat.kd * MAX(l * normal, 0.0f)
                         + polygon->mat.ks * pow(MAX(r * v, 0.0f), polygon->mat.sp);
             total_intensity += multiplyComponents(intensity, coeffs);
         }
@@ -526,7 +500,8 @@ public:
 };
 
 void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat) {
-	cout << fileName << endl;
+	cout << "Parsing obj file: " << fileName << "..." <<  endl;
+
 	vector<vec3> verts;
 	verts.push_back(vec3(0, 0, 0)); // Kill index 0, since vertices are numbered 1 ... n
 	ifstream objFile(fileName);
@@ -543,7 +518,9 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
         if (currentLine.empty()) {
         	continue;
         }
-        if (strcmp(argument.c_str(), "v") == 0) {
+        if (strcmp(argument.c_str(), "#") == 0) {
+        	continue;
+        } else if (strcmp(argument.c_str(), "v") == 0) {
         	//cout << "found vertice" << endl;
         	float args[3];
             int index = 0;
@@ -572,6 +549,7 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
         }
     }
     objFile.close();
+    cout << "Finished parsing obj file." << endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -731,6 +709,20 @@ int main(int argc, char* argv[]) {
                 string temp;
                 iss >> temp;
                 parseObj(temp.c_str(), &sceneObjects, curMat);
+            } else if (strcmp(argument.c_str(), "lta") == 0) {
+            	float args[3];
+            	string temp;
+            	int index = 0;
+                while (iss >> temp) {
+                	args[index] = atof(temp.c_str());
+                	index++;
+                }
+                if (index != 3) {
+                	cerr << "Incorrect number of arguments for ambient light." << endl;
+                }
+                vec3 ambientColor = vec3(args[0], args[1], args[2]);
+                Light ambientLight = Light(ambientColor);
+                scene.addAmbientLight(ambientLight);
             }
 
         } 
