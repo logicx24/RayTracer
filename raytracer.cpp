@@ -198,7 +198,7 @@ public:
         film.at(sample.y * width + sample.x)[BLUE] = color[BLUE];
     }
 
-    void writeFile(int pixWidth, int pixHeight) {
+    void writeFile(string fileName, int pixWidth, int pixHeight) {
         if (pixWidth % width != 0 || pixHeight % height != 0) {
         	cerr << "Image will not fit nicely into output dimensions." << endl;
         	exit(0);
@@ -224,7 +224,7 @@ public:
             	image.at(position + 3) = 255; 
             }
         }
-        unsigned error = lodepng::encode("img.png", image,  width, height);
+        unsigned error = lodepng::encode(fileName, image,  width, height);
         if (error) {
         	cout << "lodepng error." << endl;
         }
@@ -468,8 +468,8 @@ public:
     	ambientLight = l;
     }
 
-    void writeFile(int pixWidth, int pixHeight) {
-    	film.writeFile(pixWidth, pixHeight);
+    void writeFile(string fileName, int pixWidth, int pixHeight) {
+    	film.writeFile(fileName, pixWidth, pixHeight);
     }
 
     void render() {
@@ -621,11 +621,7 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
     cout << "Finished parsing obj file." << endl;
 }
 
-int main(int argc, char* argv[]) {
-    printf("Ray Tracer!\n");
-    float eps = 0.05f;
-    int width = 1000;
-    int height = 1000;
+Scene* parseSceneFile(string fileName, float eps, int width, int height) {
     float sp;
     vec3 eye, ll, lr, ul, ur, ka, kd, ks, kr;
 
@@ -633,7 +629,7 @@ int main(int argc, char* argv[]) {
     
     Film film = Film(width, height);
     Camera pcam;
-    Scene scene;
+    Scene *scene;
     
     Material curMat;
     vector<Polygon*> sceneObjects;
@@ -643,7 +639,7 @@ int main(int argc, char* argv[]) {
     int index = 0;
     string argument;
     string curline;
-    ifstream myfile (argv[1]);
+    ifstream myfile (fileName);
     if (myfile.is_open()){
         while (getline (myfile, curline)) {
             //cout << curline << '\n';
@@ -664,7 +660,7 @@ int main(int argc, char* argv[]) {
                 ur = vec3(args[12], args[13], args[14]);
 
                 pcam = Camera(eye, ul, ur, ll, lr, width, height);
-                scene = Scene(pcam, film, eps, width, height);
+                scene = new Scene(pcam, film, eps, width, height);
             
             } else if (argumentMatches(argument, "mat")) {
                 float args[13];
@@ -726,7 +722,7 @@ int main(int argc, char* argv[]) {
                 parseArgs(args, &iss, 3, "Incorrect number of arguments for ambient light.");
                 vec3 ambientColor = vec3(args[0], args[1], args[2]);
                 Light ambientLight = Light(ambientColor);
-                scene.addAmbientLight(ambientLight);
+                scene->addAmbientLight(ambientLight);
             } else if (argumentMatches(argument, "obj")) {
                 string temp;
                 iss >> temp;
@@ -752,10 +748,10 @@ int main(int argc, char* argv[]) {
         } 
 
         for (int i = 0; i < sceneObjects.size(); i++){
-            scene.addObject(sceneObjects[i]);
+            scene->addObject(sceneObjects[i]);
         }
         for (int i = 0; i < sceneLights.size(); i++) {
-            scene.addLight(sceneLights[i]);
+            scene->addLight(sceneLights[i]);
         }
         
         myfile.close();
@@ -764,15 +760,30 @@ int main(int argc, char* argv[]) {
         cerr << "No scene file found." << endl;
         exit(0);
     }
+    return scene;
+}
+
+int main(int argc, char* argv[]) {
+   
+    cout << "Ray Tracer!" << endl;
+     
+    string outFile = "output.png";
+
+    float eps = 0.05f;
+    int width = 1000;
+    int height = 1000;
+   
+    Scene *scene = parseSceneFile(argv[1], eps, width, height);
 
     cout << "Rendering Scene..." << endl;
 
-    scene.render();
+    scene->render();
     
     cout << "Scene render completed." << endl;
     cout << "Writing to file..." << endl;
-
-    scene.writeFile(width, height);
+    
+    if (argc > 2) { outFile = argv[2]; }
+    scene->writeFile(outFile, width, height);
     
     cout << "Image saved." << endl;
         

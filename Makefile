@@ -11,4 +11,4 @@ lodepng.o:
 file:
 	./raytracer > ~/Desktop/out.txt
 clean:
-	$(RM) *.o raytracer lodepng img.png
+	$(RM) *.o raytracer lodepng 
