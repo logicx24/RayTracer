@@ -161,6 +161,10 @@ public:
         return true;
     }
 
+    int percentage() {
+        return int((float(y * width + x) / float(width * height)) * 100);
+    }
+
 };
 
 vec3 floatToByte(vec3 &fcolor) {
@@ -469,15 +473,19 @@ public:
     }
 
     void render() {
-        //cout << "rendering bitch" << endl;
-    	Sampler sampler = Sampler(width, height);
-    	Sample sample = Sample();
-    	while (sampler.generateSample(&sample)) {
-    		Ray testRay = cam.generateRay(sample);
-    		vec3 color = traceRay(testRay, maxDepth);
-    		film.writeToFilm(sample, color);
-    	}
-
+        Sampler sampler = Sampler(width, height);
+        Sample sample = Sample();
+        int count = 0;
+        while (sampler.generateSample(&sample)) {
+            Ray testRay = cam.generateRay(sample);
+            vec3 color = traceRay(testRay, maxDepth);
+            film.writeToFilm(sample, color);
+            if (count > 100000) {
+                cout << sampler.percentage() << "\% completed." << endl;
+                count = 0;
+            }
+            count++;
+        }
     }
 
     vec3 traceRay(Ray &ray, int depth) {
@@ -545,6 +553,37 @@ public:
 
 };
 
+void parseArgs(float args[], istringstream *iss, int numArgs, string errMessage) {
+    string temp;
+    int index = 0;
+    while (*iss >> temp){
+        args[index] = atof(temp.c_str());
+        index++;
+    }
+
+    if (index != numArgs){
+        cerr << errMessage << endl;
+    }
+}
+
+void parseArgs(int args[], istringstream *iss, int numArgs, string errMessage) {
+    string temp;
+    int index = 0;
+    while (*iss >> temp){
+        args[index] = atoi(temp.c_str());
+        index++;
+    }
+
+    if (index != numArgs){
+        cerr << errMessage << endl;
+    }
+
+}
+
+bool argumentMatches(string argument, const char *compare) {
+    return (strcmp(argument.c_str(), compare) == 0);
+}
+
 void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat) {
 	cout << "Parsing obj file: " << fileName << "..." <<  endl;
 
@@ -564,32 +603,16 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
         if (currentLine.empty()) {
         	continue;
         }
-        if (strcmp(argument.c_str(), "#") == 0) {
+        if (argumentMatches(argument, "#")) {
         	continue;
-        } else if (strcmp(argument.c_str(), "v") == 0) {
+        } else if (argumentMatches(argument, "v")) {
         	//cout << "found vertice" << endl;
         	float args[3];
-            int index = 0;
-            string temp;
-            while (iss >> temp) {
-            	args[index] = atof(temp.c_str());
-            	index++;
-            }
-            if (index != 3) {
-            	cerr << "Incorrect number of arguments for vertex in obj file." << endl;
-            }
+            parseArgs(args, &iss, 3, "Incorrect number of arguments for vertex in obj file.");
             verts.push_back(vec3(args[0], args[1], args[2]));
-        } else if (strcmp(argument.c_str(), "f") == 0) {
+        } else if (argumentMatches(argument, "f")) {
         	int args[3];
-        	int index = 0;
-        	string temp;
-            while (iss >> temp) {
-            	args[index] = atoi(temp.c_str());
-            	index++;
-            }
-            if (index != 3) {
-            	cerr << "More than 3 vertices specified for face, only using first 3." << endl;
-            }
+        	parseArgs(args, &iss, 3, "More than 3 vertices specified for face, only using first 3.");
             Triangle *t = new Triangle(verts[args[0]], verts[args[1]], verts[args[2]], curMat);
             sceneObjects->push_back(t);
         }
@@ -631,22 +654,9 @@ int main(int argc, char* argv[]) {
             if (curline.empty()){
                 continue;
             }
-            if (strcmp(argument.c_str(), "cam") == 0){
-
+            if (argumentMatches(argument, "cam")) {
                 float args[15];
-
-                string temp;
-                index = 0;
-                while (iss >> temp){
-                    // cout << temp << endl;
-                    args[index] = atof(temp.c_str());
-                    index++;
-                }
-
-                if (index != 15){
-                    cerr << "Incorrect number of arguments for camera." << endl;
-                }
-
+                parseArgs(args, &iss, 15, "Incorrect number of arguments for camera");
                 eye = vec3(args[0], args[1], args[2]);
                 ll = vec3(args[3], args[4], args[5]);
                 lr = vec3(args[6], args[7], args[8]);
@@ -656,20 +666,9 @@ int main(int argc, char* argv[]) {
                 pcam = Camera(eye, ul, ur, ll, lr, width, height);
                 scene = Scene(pcam, film, eps, width, height);
             
-            } else if (strcmp(argument.c_str(), "mat") == 0){
+            } else if (argumentMatches(argument, "mat")) {
                 float args[13];
-                string temp;
-                int index = 0;
-                while (iss >> temp){
-                    // cout << index << endl;
-                    args[index] = atof(temp.c_str());
-                    index++;
-                }
-
-                if (index != 13){
-                    // cout << index << endl;
-                    cerr << "Incorrect number of arguments for material." << endl;
-                }
+                parseArgs(args, &iss, 13, "Incorrect number of arguments for material.");
                 ka = vec3(args[0],args[1],args[2]);
                 kd = vec3(args[3],args[4],args[5]);
                 ks = vec3(args[6],args[7],args[8]);
@@ -677,147 +676,75 @@ int main(int argc, char* argv[]) {
                 kr = vec3(args[10],args[11],args[12]);
                 curMat = Material(ka,kd,ks, kr,sp);
             
-            } else if (strcmp(argument.c_str(), "sph") == 0){
+            } else if (argumentMatches(argument, "sph")) {
                 float args[4];
-                string temp;
-                int index = 0;
-                while (iss >> temp){
-                    //cout << index << endl;
-                    args[index] = atof(temp.c_str());
-                    index++;
-                }
-
-                if (index != 4){
-                    // cout << index << endl;
-                    cerr << "Incorrect number of arguments for sphere." << endl;
-                }
+                parseArgs(args, &iss, 4, "Incorrect number of arguments for sphere.");
                 vec3 sphereCenter = vec3(args[0],args[1],args[2]);
-                if (currTrans == identity3D()) {
-                    sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat));
-                } else {
-                    sceneObjects.push_back(new Ellipse(sphereCenter, args[3], curMat, currTrans));
-                }
+                sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat));
             
-            } else if (strcmp(argument.c_str(), "tri") == 0) {
+            } else if (argumentMatches(argument, "tri")) {
                 float args[9];
-                string temp;
-                int index = 0;
-                while (iss >> temp){
-                    // cout << index << endl;
-                    args[index] = atof(temp.c_str());
-                    index++;
-                }
-
-                if (index != 9){
-                    // cout << index << endl;
-                    cerr << "Incorrect number of arguments for triangle." << endl;
-                }
+                parseArgs(args, &iss, 9, "Incorrect number of arguments for triangle.");
                 vec3 v1 = vec3(args[0],args[1],args[2]);
                 vec3 v2 = vec3(args[3],args[4],args[5]);
                 vec3 v3 = vec3(args[6],args[7],args[8]);
 
                 sceneObjects.push_back(new Triangle(v1, v2, v3, curMat));
             
-            } else if (strcmp(argument.c_str(), "ltp") == 0){
+            } else if (argumentMatches(argument, "ltp")) {
                 float args[6];
                 int falloff = 0;
                 string temp;
                 int index = 0;
                 while (iss >> temp){
-                    // cout << index << endl;
                     if (index == 6){
                         falloff = atoi(temp.c_str());
-                    }
-                    else{
+                    } else {
                         args[index] = atof(temp.c_str());
                     }
                     index++;
                 }
                 if (index > 7 || index < 6){
-                    // cout << index << endl;
                     cerr << "Incorrect number of arguments for point light." << endl;
                 }
                 vec3 color = vec3(args[3],args[4],args[5]);
                 vec3 pos = vec3(args[0],args[1],args[2]);
                 sceneLights.push_back(new Light(color, pos, falloff, true));
 
-            } else if (strcmp(argument.c_str(), "ltd") == 0){
+            } else if (argumentMatches(argument, "ltd")) {
                 float args[6];
-                string temp;
-                int index = 0;
-                while (iss >> temp){
-                    // cout << index << endl;
-                    args[index] = atof(temp.c_str());
-                    index++;
-                }
-                if (index != 6){
-                    // cout << index << endl;
-                    cerr << "Incorrect number of arguments for directional light." << endl;
-                }
+                parseArgs(args, &iss, 6, "Incorrect number of arguments for direct light.");
                 vec3 color = vec3(args[3],args[4],args[5]);
                 vec3 pos = vec3(args[0],args[1],args[2]);
                 sceneLights.push_back(new Light(color, pos, 0, false));
-            } else if (strcmp(argument.c_str(), "obj") == 0) {
-                string temp;
-                iss >> temp;
-                parseObj(temp.c_str(), &sceneObjects, curMat);
-            } else if (strcmp(argument.c_str(), "lta") == 0) {
-            	float args[3];
-            	string temp;
-            	int index = 0;
-                while (iss >> temp) {
-                	args[index] = atof(temp.c_str());
-                	index++;
-                }
-                if (index != 3) {
-                	cerr << "Incorrect number of arguments for ambient light." << endl;
-                }
+            } else if (argumentMatches(argument, "lta")) {
+                float args[3];
+                parseArgs(args, &iss, 3, "Incorrect number of arguments for ambient light.");
                 vec3 ambientColor = vec3(args[0], args[1], args[2]);
                 Light ambientLight = Light(ambientColor);
                 scene.addAmbientLight(ambientLight);
-            } else if (strcmp(argument.c_str(), "xfs") == 0) {
-                float args[3];
+            } else if (argumentMatches(argument, "obj")) {
                 string temp;
-                int index = 0;
-                while (iss >> temp) {
-                    args[index] = atof(temp.c_str());
-                    index++;
-                }
-                if (index != 3) {
-                    cerr << "Incorrect number of arguments for scaling." << endl;
-                }
+                iss >> temp;
+                parseObj(temp.c_str(), &sceneObjects, curMat);
+            } else if (argumentMatches(argument, "xfs")) {
+                float args[3];
+                parseArgs(args, &iss, 3, "Incorrect number of arguments for scaling transformation.");
                 vec3 transformation = vec3(args[0], args[1], args[2]);
                 currTrans = currTrans * scaling3D(transformation); 
-            } else if (strcmp(argument.c_str(), "xft") == 0) {
+            } else if (argumentMatches(argument, "xft")) {
                 float args[3];
-                string temp;
-                int index = 0;
-                while (iss >> temp) {
-                    args[index] = atof(temp.c_str());
-                    index++;
-                }
-                if (index != 3) {
-                    cerr << "Incorrect number of arguments for translation." << endl;
-                }
+                parseArgs(args, &iss, 3, "Incorrect number of arguments for translation transformation.");
                 vec3 transformation = vec3(args[0], args[1], args[2]);
                 currTrans = currTrans * translation3D(transformation); 
-            } else if (strcmp(argument.c_str(), "xfr") == 0) {
+            } else if (argumentMatches(argument, "xfr")) {
                 float args[3];
-                string temp;
-                int index = 0;
-                while (iss >> temp) {
-                    args[index] = atof(temp.c_str());
-                    index++;
-                }
-                if (index != 3) {
-                    cerr << "Incorrect number of arguments for rotation." << endl;
-                }
+                parseArgs(args, &iss, 3, "Incorrect number of arguments for rotation transformation.");
                 vec3 transformation = vec3(args[0], args[1], args[2]);
                 currTrans = currTrans * rotation3D(transformation, magnitude(transformation)); 
-            } else if (strcmp(argument.c_str(), "xfz") == 0) {
+            } else if (argumentMatches(argument, "xfz")) {
                 currTrans = identity3D();
             }
-
         } 
 
         for (int i = 0; i < sceneObjects.size(); i++){
@@ -829,9 +756,8 @@ int main(int argc, char* argv[]) {
         
         myfile.close();
 
-    }
-    else {
-        cerr << "No file! Or bad input path!" << endl;
+    } else {
+        cerr << "No scene file found." << endl;
         exit(0);
     }
 
@@ -845,80 +771,6 @@ int main(int argc, char* argv[]) {
     scene.writeFile(width, height);
     
     cout << "Image saved." << endl;
-
-    /*
-    int width = 500;
-    int height = 500;
-    float eps = 0.05f;
-    vec3 eye = vec3(0, 0, 0);
-    vec3 ul = vec3(-1, 1, -3);
-    vec3 ur = vec3(1, 1, -3);
-    vec3 ll = vec3(-1, -1, -3);
-    vec3 lr = vec3(1, -1, -3);
-    Film film = Film(width, height);
-    Camera cam = Camera(eye, ul, ur, ll, lr, width, height);
-    Scene scene = Scene(cam, film, eps, width, height);
-
-    vec3 ka = vec3(0.1, 0.1, 0.1);
-    vec3 kd = vec3(1, 0, 1);
-    vec3 ks = vec3(1, 1, 1);
-    vec3 kr = vec3(0, 0, 0);
-    float sp = 50.0f;
-
-    vec3 ka1 = vec3(0.1, 0.1, 0.1);
-    vec3 kd1 = vec3(1, 1, 0);
-    vec3 ks1 = vec3(1, 1, 1);
-    vec3 kr1 = vec3(0, 0, 0);
-    float sp1 = 50.0f;
-
-    vec3 ka2 = vec3(0.1, 0.1, 0.1);
-    vec3 kd2 = vec3(0, 1, 1);
-    vec3 ks2 = vec3(1, 1, 1);
-    vec3 kr2 = vec3(0, 0, 0);
-    float sp2 = 50.0f;
-
-    vec3 ka3 = vec3(0.1, 0.1, 0.1);
-    vec3 kd3 = vec3(0.1, 0.1, 0.1);
-    vec3 ks3 = vec3(1, 1, 1);
-    vec3 kr3 = vec3(1, 1, 1);
-    float sp3 = 50.0f;
-
-    Material sphereMat = Material(ka, kd, ks, kr, sp);
-    Material sphereMat1 = Material(ka1, kd1, ks1, kr1, sp1);
-    Material sphereMat2 = Material(ka2, kd2, ks2, kr2, sp2);
-    Material triMat = Material(ka3, kd3, ks3, kr3, sp3);
-
-    vec3 sphereCenter1 = vec3(0, 0, -20);
-    Sphere sphere1 = Sphere(sphereCenter1, 3.0f, sphereMat);
-    scene.addObject(&sphere1);
-    
-    vec3 sphereCenter2 = vec3(-2, 2, -15);
-    Sphere sphere2 = Sphere(sphereCenter2, 1.0f, sphereMat1);
-    scene.addObject(&sphere2);
-
-    vec3 sphereCenter3 = vec3(-2, -2, -15);
-    Sphere sphere3 = Sphere(sphereCenter3, 1.0f, sphereMat2);
-    scene.addObject(&sphere3);
-
-    vec3 v1 = vec3(5, 5, -17);
-    vec3 v2 = vec3(1, 4, -20);
-    vec3 v3 = vec3(6, -1, -20);
-    Triangle triangle = Triangle(v1, v2, v3, triMat);
-    scene.addObject(&triangle);
-
-    vec3 lightColor1 = vec3(255, 255, 255);
-    vec3 lightPos1 = vec3(0.57735027f, -0.57735027f, -0.57735027f);
-    Light dl1 = Light(lightColor1, lightPos1, 0, false);
-    scene.addLight(&dl1);
-
-    vec3 lightColor2 = vec3(0, 0, 255);
-    vec3 lightPos2 = vec3(0.57735027f, 0.57735027f, -0.57735027f);
-    Light pl2 = Light(lightColor2, lightPos2, 0, false);
-    scene.addLight(&pl2);
-
-    scene.render();
-    scene.writeFile(width, height);
-    */
         
 	return 0;
 }
