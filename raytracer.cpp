@@ -476,11 +476,12 @@ public:
         Sampler sampler = Sampler(width, height);
         Sample sample = Sample();
         int count = 0;
+        int tenthPixels = width * height / 10;
         while (sampler.generateSample(&sample)) {
             Ray testRay = cam.generateRay(sample);
             vec3 color = traceRay(testRay, maxDepth);
             film.writeToFilm(sample, color);
-            if (count > 100000) {
+            if (count > tenthPixels) {
                 cout << sampler.percentage() << "\% completed." << endl;
                 count = 0;
             }
@@ -585,8 +586,6 @@ bool argumentMatches(string argument, const char *compare) {
 }
 
 void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat) {
-	cout << "Parsing obj file: " << fileName << "..." <<  endl;
-
 	vector<vec3> verts;
 	verts.push_back(vec3(0, 0, 0)); // Kill index 0, since vertices are numbered 1 ... n
 	ifstream objFile(fileName);
@@ -600,13 +599,9 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
     	istringstream iss;
     	iss.str(currentLine);
     	iss >> argument;
-        if (currentLine.empty()) {
-        	continue;
-        }
-        if (argumentMatches(argument, "#")) {
+        if (currentLine.empty() || argumentMatches(argument, "#")) {
         	continue;
         } else if (argumentMatches(argument, "v")) {
-        	//cout << "found vertice" << endl;
         	float args[3];
             parseArgs(args, &iss, 3, "Incorrect number of arguments for vertex in obj file.");
             verts.push_back(vec3(args[0], args[1], args[2]));
@@ -615,10 +610,11 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
         	parseArgs(args, &iss, 3, "More than 3 vertices specified for face, only using first 3.");
             Triangle *t = new Triangle(verts[args[0]], verts[args[1]], verts[args[2]], curMat);
             sceneObjects->push_back(t);
+        } else {
+        	cerr << "Unknown input in obj file: " << fileName << "." << endl; 
         }
     }
     objFile.close();
-    cout << "Finished parsing obj file." << endl;
 }
 
 Scene* parseSceneFile(string fileName, float eps, int width, int height) {
@@ -649,8 +645,7 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
 
             if (curline.empty()){
                 continue;
-            }
-            if (argumentMatches(argument, "cam")) {
+            } else if (argumentMatches(argument, "cam")) {
                 float args[15];
                 parseArgs(args, &iss, 15, "Incorrect number of arguments for camera");
                 eye = vec3(args[0], args[1], args[2]);
@@ -782,10 +777,10 @@ int main(int argc, char* argv[]) {
     cout << "Scene render completed." << endl;
     cout << "Writing to file..." << endl;
     
-    if (argc > 2) { outFile = argv[2]; }
+    if (argc > 2) outFile = argv[2];
     scene->writeFile(outFile, width, height);
     
-    cout << "Image saved." << endl;
+    cout << "Image saved as " << outFile << "." << endl;
         
 	return 0;
 }
