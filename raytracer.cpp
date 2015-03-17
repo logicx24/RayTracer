@@ -110,7 +110,7 @@ public:
     }
 
     Ray lightRay(vec3 &point) {
-        vec3 rayVec = lightVec(point);
+        vec3 rayVec = lightVec(point).normalize();
         return Ray(point, rayVec);
     }
 
@@ -238,6 +238,7 @@ public:
     virtual bool intersects(Ray &ray) = 0;
     virtual float intersection(Ray &ray, float eps) = 0;
     virtual vec3 normal(vec3 &point) = 0;
+    virtual Ray transformedRay(Ray &ray) = 0;
 };
 
 class Triangle : public Polygon {
@@ -256,6 +257,10 @@ public:
     bool intersects(Ray &ray) {
         return intersection(ray, 0.1f) != MAXFLOAT;
 
+    }
+
+    Ray transformedRay(Ray &ray) {
+        return ray;
     }
 
     float intersection(Ray &ray, float eps) {
@@ -326,7 +331,11 @@ public:
 
 	bool intersects(Ray &ray) {
 	   return intersection(ray, 0.1f) != MAXFLOAT;
-    }  
+    }
+
+    Ray transformedRay(Ray &ray) {
+        return ray;
+    }
 
 	float intersection(Ray &ray, float eps) {
 		vec3 p_c = ray.pos - center;
@@ -376,8 +385,8 @@ public:
     bool intersects(Ray &ray) {
         return intersection(ray, 0.1f) != MAXFLOAT;
     }
-
-    float intersection(Ray &ray, float eps) {
+    
+    Ray transformedRay(Ray &ray) {
         vec3 transing = inverse * ray.pos;
         vec4 tmp = vec4(ray.vec[VX], ray.vec[VY], ray.vec[VZ], 0.0f);
         tmp = inverse * tmp;
@@ -387,6 +396,11 @@ public:
         //cout << "t2" << endl;
         //printVec3(transing2);
         Ray ray2 = Ray(transing, transing2);
+        return ray2;
+    }
+
+    float intersection(Ray &ray, float eps) {
+        Ray ray2 = transformedRay(ray);
         return Sphere::intersection(ray2, eps);
     }
 
@@ -502,6 +516,7 @@ public:
 		}
 		if (min_t != MAXFLOAT) {
 			Polygon *hitObject = objects[closeIndex];
+            ray = hitObject->transformedRay(ray);
 		    vec3 intersection = ray.pointAt(min_t);
             vec3 normal = hitObject->normal(intersection);
             normal.normalize();
