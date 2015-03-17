@@ -1291,10 +1291,12 @@ inline mat4 rotation3D(vec3 Axis, const double angleDeg) {
 }
 
 inline mat4 scaling3D(const vec3& scaleVector)
-{   return mat4(vec4(scaleVector[VX], 0.0, 0.0, 0.0),
+{   return mat4(
+		vec4(scaleVector[VX], 0.0, 0.0, 0.0),
 		vec4(0.0, scaleVector[VY], 0.0, 0.0),
 		vec4(0.0, 0.0, scaleVector[VZ], 0.0),
-		vec4(0.0, 0.0, 0.0, 1.0)); }
+		vec4(0.0, 0.0, 0.0, 1.0));
+}
 
 inline mat4 perspective3D(const double d)
 {   return mat4(vec4(1.0, 0.0, 0.0, 0.0),

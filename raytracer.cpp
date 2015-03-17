@@ -111,7 +111,6 @@ public:
 
     Ray lightRay(vec3 &point) {
         vec3 rayVec = lightVec(point);
-        rayVec.normalize();
         return Ray(point, rayVec);
     }
 
@@ -313,6 +312,8 @@ public:
 	vec3 center;
 	float radius;
 
+    Sphere(){}
+
 	Sphere(vec3 &_center, float _radius, Material &_mat) {
 		center = _center;
 		radius = _radius;
@@ -352,6 +353,52 @@ public:
     }
 };
 
+class Ellipse : public Sphere {
+public:
+
+    mat4 transform;
+    mat4 inverse;
+    mat4 inverseTranspose;
+
+    Ellipse(vec3 &_center, float _radius, Material &_mat, mat4 &_transform) {
+        center = _center;
+        radius = _radius;
+        mat = _mat;
+        transform = _transform;
+        inverse = transform.inverse();
+        inverseTranspose = inverse.transpose();
+    }
+
+    bool intersects(Ray &ray) {
+        return intersection(ray, 0.1f) != MAXFLOAT;
+    }
+
+    float intersection(Ray &ray, float eps) {
+        vec3 transing = inverse * ray.pos;
+        vec4 tmp = vec4(ray.vec[VX], ray.vec[VY], ray.vec[VZ], 0.0f);
+        tmp = inverse * tmp;
+        vec3 transing2 = vec3(tmp[VX], tmp[VY], tmp[VZ]);
+        //cout <<  "t1" << endl;
+        //printVec3(transing);
+        //cout << "t2" << endl;
+        //printVec3(transing2);
+        Ray ray2 = Ray(transing, transing2);
+        return Sphere::intersection(ray2, eps);
+    }
+
+    vec3 normal(vec3 &point) {
+        vec3 normal = (point - center);
+        vec4 temp = vec4(normal[VX], normal[VY], normal[VZ], 0.0f);
+        //cout << "temp: " << temp << endl;
+        //cout << "iT: " << endl << inverseTranspose << endl;
+        vec4 normal1 = inverseTranspose * temp;
+        //cout << "normal: " << normal1 << endl;
+        normal = vec3(normal1[VX], normal1[VY], normal1[VZ]);
+        //cout << "3D normal: " << normal << endl;
+        return normal;
+    }
+};
+
 class Camera {
 public:
 
@@ -376,7 +423,6 @@ public:
         float v = float(sample.y) / float(height);
         vec3 c = (ll*(1-u) + lr*u)*(1-v) + (ul*(1-u) + ur*u)*v;
         vec3 testRayVec = c - eye;
-        testRayVec = testRayVec.normalize();
 	    return Ray(eye, testRayVec);
 	}
 };
@@ -559,6 +605,8 @@ int main(int argc, char* argv[]) {
     int height = 1000;
     float sp;
     vec3 eye, ll, lr, ul, ur, ka, kd, ks, kr;
+
+    mat4 currTrans = identity3D();
     
     Film film = Film(width, height);
     Camera pcam;
@@ -644,7 +692,11 @@ int main(int argc, char* argv[]) {
                     cerr << "Incorrect number of arguments for sphere." << endl;
                 }
                 vec3 sphereCenter = vec3(args[0],args[1],args[2]);
-                sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat));
+                if (currTrans == identity3D()) {
+                    sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat));
+                } else {
+                    sceneObjects.push_back(new Ellipse(sphereCenter, args[3], curMat, currTrans));
+                }
             
             } else if (strcmp(argument.c_str(), "tri") == 0) {
                 float args[9];
@@ -723,6 +775,47 @@ int main(int argc, char* argv[]) {
                 vec3 ambientColor = vec3(args[0], args[1], args[2]);
                 Light ambientLight = Light(ambientColor);
                 scene.addAmbientLight(ambientLight);
+            } else if (strcmp(argument.c_str(), "xfs") == 0) {
+                float args[3];
+                string temp;
+                int index = 0;
+                while (iss >> temp) {
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
+                if (index != 3) {
+                    cerr << "Incorrect number of arguments for scaling." << endl;
+                }
+                vec3 transformation = vec3(args[0], args[1], args[2]);
+                currTrans = currTrans * scaling3D(transformation); 
+            } else if (strcmp(argument.c_str(), "xft") == 0) {
+                float args[3];
+                string temp;
+                int index = 0;
+                while (iss >> temp) {
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
+                if (index != 3) {
+                    cerr << "Incorrect number of arguments for translation." << endl;
+                }
+                vec3 transformation = vec3(args[0], args[1], args[2]);
+                currTrans = currTrans * translation3D(transformation); 
+            } else if (strcmp(argument.c_str(), "xfr") == 0) {
+                float args[3];
+                string temp;
+                int index = 0;
+                while (iss >> temp) {
+                    args[index] = atof(temp.c_str());
+                    index++;
+                }
+                if (index != 3) {
+                    cerr << "Incorrect number of arguments for rotation." << endl;
+                }
+                vec3 transformation = vec3(args[0], args[1], args[2]);
+                currTrans = currTrans * rotation3D(transformation, magnitude(transformation)); 
+            } else if (strcmp(argument.c_str(), "xfz") == 0) {
+                currTrans = identity3D();
             }
 
         } 
