@@ -680,7 +680,11 @@ int main(int argc, char* argv[]) {
                 float args[4];
                 parseArgs(args, &iss, 4, "Incorrect number of arguments for sphere.");
                 vec3 sphereCenter = vec3(args[0],args[1],args[2]);
-                sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat));
+                if (currTrans == identity3D()) {
+                    sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat));
+                } else {
+                    sceneObjects.push_back(new Ellipse(sphereCenter, args[3], curMat, currTrans));
+                }
             
             } else if (argumentMatches(argument, "tri")) {
                 float args[9];
