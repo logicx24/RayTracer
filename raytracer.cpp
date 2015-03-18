@@ -67,6 +67,10 @@ public:
 	vec3 pos, vec;
 	float t_min, t_max;
 
+    Ray() {
+    	pos = vec3(0, 0, 0);
+    	vec = vec3(0, 0, 0);
+    }
 	Ray(vec3 &p, vec3 &v) {
 		pos = p;
 		vec = v;
@@ -234,22 +238,54 @@ public:
 class Polygon {
 public:
     Material mat;
+    mat4 transform;
+    mat4 inverseTransform;
+    mat4 inverseTranspose;
     Polygon(){};
+    Polygon(mat4 &_transform, Material &_mat) {
+    	mat = _mat;
+    	transform= _transform;
+    	inverseTransform = transform.inverse();
+    	inverseTranspose = inverseTransform.transpose();
+    }
+    Ray transformRay(Ray &ray) {
+        vec4 tmpPos = vec4(ray.pos, 1.0f);
+        tmpPos = tmpPos * inverseTransform;
+        vec3 rayPos = vec3(tmpPos);
+
+        vec4 tmpVec = vec4(ray.vec, 0.0f);
+        tmpVec = tmpVec * inverseTransform;
+        vec3 rayVec = vec3(tmpVec, VW);
+        
+        return Ray(rayPos, rayVec);
+    }
+    vec3 transformNormal(vec3 &normal) {
+
+        vec4 normal4= vec4(normal, 0.0f);
+        normal4 = inverseTranspose * normal4;
+        vec3 normal3  = vec3(normal4, VW);
+        return normal3;
+    }
+    vec3 transformIntersection(vec3 &intersection) {
+    	vec4 tmpIntersection = vec4(intersection, 1.0f);
+    	tmpIntersection = tmpIntersection * transform;
+    	vec3 intersection3 = vec3(tmpIntersection);
+        return intersection3;
+    }
     virtual bool intersects(Ray &ray) = 0;
     virtual float intersection(Ray &ray, float eps) = 0;
     virtual vec3 normal(vec3 &point) = 0;
-    virtual Ray transformedRay(Ray &ray) = 0;
 };
 
 class Triangle : public Polygon {
 public:
     vec3 vertex1, vertex2, vertex3, edge1, edge2;
 
-    Triangle(vec3 &_v1, vec3 &_v2, vec3 &_v3, Material &_mat) {
+    Triangle(vec3 &_v1, vec3 &_v2, vec3 &_v3, Material &_mat, mat4 _transform) 
+    : Polygon(_transform, _mat) {
         vertex1 = _v1;
         vertex2 = _v2;
         vertex3 = _v3;
-        mat = _mat;
         edge1 = vertex3 - vertex1;
         edge2 = vertex2 - vertex1;
     }
@@ -257,10 +293,6 @@ public:
     bool intersects(Ray &ray) {
         return intersection(ray, 0.1f) != MAXFLOAT;
 
-    }
-
-    Ray transformedRay(Ray &ray) {
-        return ray;
     }
 
     float intersection(Ray &ray, float eps) {
@@ -323,18 +355,14 @@ public:
 
     Sphere(){}
 
-	Sphere(vec3 &_center, float _radius, Material &_mat) {
+	Sphere(vec3 &_center, float _radius, Material &_mat, mat4 _transform) 
+	: Polygon(_transform, _mat) {
 		center = _center;
 		radius = _radius;
-		mat = _mat;
 	}
 
 	bool intersects(Ray &ray) {
 	   return intersection(ray, 0.1f) != MAXFLOAT;
-    }
-
-    Ray transformedRay(Ray &ray) {
-        return ray;
     }
 
 	float intersection(Ray &ray, float eps) {
@@ -366,57 +394,6 @@ public:
     }
 };
 
-class Ellipse : public Sphere {
-public:
-
-    mat4 transform;
-    mat4 inverse;
-    mat4 inverseTranspose;
-
-    Ellipse(vec3 &_center, float _radius, Material &_mat, mat4 &_transform) {
-        center = _center;
-        radius = _radius;
-        mat = _mat;
-        transform = _transform;
-        inverse = transform.inverse();
-        inverseTranspose = inverse.transpose();
-    }
-
-    bool intersects(Ray &ray) {
-        return intersection(ray, 0.1f) != MAXFLOAT;
-    }
-    
-    Ray transformedRay(Ray &ray) {
-        vec3 transing = inverse * ray.pos;
-        vec4 tmp = vec4(ray.vec[VX], ray.vec[VY], ray.vec[VZ], 0.0f);
-        tmp = inverse * tmp;
-        vec3 transing2 = vec3(tmp[VX], tmp[VY], tmp[VZ]);
-        //cout <<  "t1" << endl;
-        //printVec3(transing);
-        //cout << "t2" << endl;
-        //printVec3(transing2);
-        Ray ray2 = Ray(transing, transing2);
-        return ray2;
-    }
-
-    float intersection(Ray &ray, float eps) {
-        Ray ray2 = transformedRay(ray);
-        return Sphere::intersection(ray2, eps);
-    }
-
-    vec3 normal(vec3 &point) {
-        vec3 normal = (point - center);
-        vec4 temp = vec4(normal[VX], normal[VY], normal[VZ], 0.0f);
-        //cout << "temp: " << temp << endl;
-        //cout << "iT: " << endl << inverseTranspose << endl;
-        vec4 normal1 = inverseTranspose * temp;
-        //cout << "normal: " << normal1 << endl;
-        normal = vec3(normal1[VX], normal1[VY], normal1[VZ]);
-        //cout << "3D normal: " << normal << endl;
-        return normal;
-    }
-};
-
 class Camera {
 public:
 
@@ -445,6 +422,12 @@ public:
 	}
 };
 
+vec3 transformNormal(vec3 &normal, Polygon *poly) {
+	vec4 tmpNormal = vec4(normal, 1.0f);
+	tmpNormal = tmpNormal * poly->inverseTranspose;
+	vec3 retNormal = vec3(tmpNormal);
+	return retNormal;
+}
 
 class Scene {
 public:
@@ -503,30 +486,35 @@ public:
         }
     }
 
-    vec3 traceRay(Ray &ray, int depth) {
-        //cout << "tracing yeah" << endl;
-    	float min_t = MAXFLOAT;
-    	int closeIndex = 0;
+    vec3 traceRay(Ray &testRay, int depth) {
+		Polygon *hitObject = NULL;
+    	float min_dist = MAXFLOAT; 
+		vec3 minIntersection;
+    	Ray ray;
 		for (int i = 0; i < objects.size(); i++) {
+			ray = objects[i]->transformRay(testRay);
 			float t = objects[i]->intersection(ray, eps);
-            if (t != MAXFLOAT && t < min_t) {
-                min_t = t;
-                closeIndex = i;
+			vec3 intersection = ray.pointAt(t);
+			intersection = objects[i]->transformIntersection(intersection);
+			float d = distance(ray.pos, intersection);
+            if (t != MAXFLOAT && d < min_dist) {
+                min_dist = d;
+                hitObject = objects[i];
+                minIntersection = intersection;
 		    }
 		}
-		if (min_t != MAXFLOAT) {
-			Polygon *hitObject = objects[closeIndex];
-            ray = hitObject->transformedRay(ray);
-		    vec3 intersection = ray.pointAt(min_t);
-            vec3 normal = hitObject->normal(intersection);
+		if (hitObject != NULL) {
+            vec3 normal = hitObject->normal(minIntersection);
+            normal = hitObject->transformNormal(normal);
             normal.normalize();
+            
             vec3 reflectionVec = ray.vec - (2*(ray.vec * normal))*normal; 
             reflectionVec.normalize();
-            Ray reflected = Ray(intersection, reflectionVec);
+            Ray reflected = Ray(minIntersection, reflectionVec);
             if (depth == 0) {
-            	return phongShade(ray, hitObject, normal, intersection);
+            	return phongShade(ray, hitObject, normal, minIntersection);
             } else {
-        	    return phongShade(ray, hitObject, normal, intersection)
+        	    return phongShade(ray, hitObject, normal, minIntersection)
         	           + multiplyComponents(traceRay(reflected, depth - 1), hitObject->mat.kr);
 		    }
 		} else {
@@ -600,6 +588,14 @@ bool argumentMatches(string argument, const char *compare) {
     return (strcmp(argument.c_str(), compare) == 0);
 }
 
+mat4 reduceTransforms(vector<mat4> *transforms) {
+    mat4 tMatrix = identity3D();
+    for (int i = transforms->size() - 1; i > 0; i--) {
+        tMatrix = tMatrix * transforms->at(i);
+    }
+    return tMatrix;
+}
+
 void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat) {
 	vector<vec3> verts;
 	verts.push_back(vec3(0, 0, 0)); // Kill index 0, since vertices are numbered 1 ... n
@@ -623,7 +619,7 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
         } else if (argumentMatches(argument, "f")) {
         	int args[3];
         	parseArgs(args, &iss, 3, "More than 3 vertices specified for face, only using first 3.");
-            Triangle *t = new Triangle(verts[args[0]], verts[args[1]], verts[args[2]], curMat);
+            Triangle *t = new Triangle(verts[args[0]], verts[args[1]], verts[args[2]], curMat, identity3D());
             sceneObjects->push_back(t);
         } else {
         	cerr << "Unknown input in obj file: " << fileName << "." << endl; 
@@ -646,6 +642,8 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
     vector<Polygon*> sceneObjects;
     vector<Light*> sceneLights;
     vector<vec3> vertices;
+    vector<mat4> transforms;
+    transforms.push_back(identity3D());
 
     int index = 0;
     string argument;
@@ -653,7 +651,6 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
     ifstream myfile (fileName);
     if (myfile.is_open()){
         while (getline (myfile, curline)) {
-            //cout << curline << '\n';
             istringstream iss;
             iss.str(curline);
             iss >> argument;
@@ -686,20 +683,22 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
                 float args[4];
                 parseArgs(args, &iss, 4, "Incorrect number of arguments for sphere.");
                 vec3 sphereCenter = vec3(args[0],args[1],args[2]);
-                if (currTrans == identity3D()) {
-                    sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat));
+                /*
+                if (transforms.size() == 1) {
+                    sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat, identity3D()));
                 } else {
-                    sceneObjects.push_back(new Ellipse(sphereCenter, args[3], curMat, currTrans));
-                }
-            
+                    mat4 currentTransform = reduceTransforms(&transforms);
+                    sceneObjects.push_back(new Ellipse(sphereCenter, args[3], curMat, currentTransform));
+                }*/
+                mat4 currentTransform = reduceTransforms(&transforms);
+                sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat, currentTransform)); 
             } else if (argumentMatches(argument, "tri")) {
                 float args[9];
                 parseArgs(args, &iss, 9, "Incorrect number of arguments for triangle.");
                 vec3 v1 = vec3(args[0],args[1],args[2]);
                 vec3 v2 = vec3(args[3],args[4],args[5]);
                 vec3 v3 = vec3(args[6],args[7],args[8]);
-
-                sceneObjects.push_back(new Triangle(v1, v2, v3, curMat));
+                sceneObjects.push_back(new Triangle(v1, v2, v3, curMat, identity3D()));
             
             } else if (argumentMatches(argument, "ltp")) {
                 float args[6];
@@ -741,19 +740,20 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
                 float args[3];
                 parseArgs(args, &iss, 3, "Incorrect number of arguments for scaling transformation.");
                 vec3 transformation = vec3(args[0], args[1], args[2]);
-                currTrans = currTrans * scaling3D(transformation); 
+                transforms.push_back(scaling3D(transformation));
             } else if (argumentMatches(argument, "xft")) {
                 float args[3];
                 parseArgs(args, &iss, 3, "Incorrect number of arguments for translation transformation.");
                 vec3 transformation = vec3(args[0], args[1], args[2]);
-                currTrans = currTrans * translation3D(transformation); 
+                transforms.push_back(translation3D(transformation));
             } else if (argumentMatches(argument, "xfr")) {
                 float args[3];
                 parseArgs(args, &iss, 3, "Incorrect number of arguments for rotation transformation.");
                 vec3 transformation = vec3(args[0], args[1], args[2]);
-                currTrans = currTrans * rotation3D(transformation, magnitude(transformation)); 
+                transforms.push_back(rotation3D(transformation, magnitude(transformation)));
             } else if (argumentMatches(argument, "xfz")) {
-                currTrans = identity3D();
+                transforms.clear();
+                transforms.push_back(identity3D());
             }
         } 
 
