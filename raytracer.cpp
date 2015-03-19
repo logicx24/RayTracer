@@ -245,42 +245,22 @@ public:
     Polygon(mat4 &_transform, Material &_mat) {
     	mat = _mat;
     	transform= _transform;
-        //cout << transform << endl;
     	inverseTransform = transform.inverse();
     	inverseTranspose = inverseTransform.transpose();
     }
     Ray transformRay(Ray &ray) {
         vec4 tmpPos = vec4(ray.pos, 1.0f);
-        // cout << tmpPos;
-        // cout << " ";
         tmpPos = inverseTransform * tmpPos;
-        // cout << tmpPos << endl;
-        // cout << inverseTransform << endl;
         vec3 rayPos = vec3(tmpPos);
-        // cout << ray.pos;
-        // cout << " ";
-        // cout << rayPos <<endl;
-
-
         vec4 tmpVec = vec4(ray.vec, 0.0f);
         tmpVec = inverseTransform * tmpVec;
-
-
         vec3 rayVec = vec3(tmpVec, VW);
-
         return Ray(rayPos, rayVec);
     }
     vec3 transformNormal(vec3 &normal) {
 
         vec4 normal4= vec4(normal, 0.0f);
-        // cout << normal4;
-        // cout << " ";
-        // cout << inverseTranspose << endl;
-
         normal4 = inverseTranspose * normal4;
-        // cout << normal4;
-        // exit(1);
-
         vec3 normal3  = vec3(normal4, VW);
         return normal3;
     }
@@ -292,12 +272,13 @@ public:
     }
     virtual bool intersects(Ray &ray) = 0;
     virtual float intersection(Ray &ray, float eps) = 0;
-    virtual vec3 normal(vec3 &point) = 0;
+    virtual vec3 normal(vec3 point) = 0;
 };
 
 class Triangle : public Polygon {
 public:
-    vec3 vertex1, vertex2, vertex3, edge1, edge2;
+    vec3 vertex1, vertex2, vertex3, edge1, edge2, normal1, normal2, normal3;
+    bool needInterpolate;
 
     Triangle(vec3 &_v1, vec3 &_v2, vec3 &_v3, Material &_mat, mat4 _transform)
     : Polygon(_transform, _mat) {
@@ -306,6 +287,21 @@ public:
         vertex3 = _v3;
         edge1 = vertex3 - vertex1;
         edge2 = vertex2 - vertex1;
+        needInterpolate = false;
+    }
+
+    Triangle(vec3 &_v1, vec3 &_v2, vec3 &_v3, Material &_mat, mat4 _transform, 
+    vec3 &_normal1, vec3 &_normal2, vec3 &_normal3)
+    : Polygon(_transform, _mat) {
+        vertex1 = _v1;
+        vertex2 = _v2;
+        vertex3 = _v3;
+        edge1 = vertex3 - vertex1;
+        edge2 = vertex2 - vertex1;
+    	normal1 = _normal1;
+    	normal2 = _normal2;
+    	normal3 = _normal3;
+    	needInterpolate = true;
     }
 
     bool intersects(Ray &ray) {
@@ -360,9 +356,21 @@ public:
         return r;
     }
 
-    vec3 normal(vec3 &point) {
-        vec3 normal = (edge2 ^ edge1);
-        return normal;
+    vec3 normal(vec3 point) {
+        if (needInterpolate) {
+            vec3 normal = (edge2 ^ edge1).normalize();
+            float a1 = normal * ((vertex2 - vertex1) ^ (vertex3 - vertex1));
+            float a2 = normal * ((vertex2 - point) ^ (vertex3 - point));
+            float a3 = normal * ((vertex3 - point) ^ (vertex1 - point));
+            float alpha = a2 / a1;
+            float beta = a3 / a1;
+            float gamma = 1.0f - alpha - beta;
+
+            vec3 iNormal = alpha * normal1 + beta * normal2 + gamma * normal3;
+            return iNormal;
+        } else {
+        	return edge2 ^ edge1;
+        }
     }
 };
 
@@ -370,16 +378,13 @@ class Sphere : public Polygon {
 public:
 	vec3 center;
 	float radius;
-    mat4 ghx;
 
     Sphere(){}
 
 	Sphere(vec3 &_center, float _radius, Material &_mat, mat4 _transform)
 	: Polygon(_transform, _mat) {
-        cout << _transform << endl;
 		center = _center;
 		radius = _radius;
-        ghx = _transform.inverse();
 	}
 
 	bool intersects(Ray &ray) {
@@ -409,9 +414,8 @@ public:
         }
 	}
 
-    vec3 normal(vec3 &point) {
-    	//vec3 normal = (point - center).normalize();
-        vec3 normal = (vec3(ghx * point) - center);
+    vec3 normal(vec3 point) {
+        vec3 normal = (point - center);
     	return normal;
     }
 };
@@ -471,7 +475,7 @@ public:
 		Light ambientLight = Light(defaultAmbientColor);
 		width = _width;
 		height = _height;
-		maxDepth = 3; //6 or 7 ideal says GSI
+		maxDepth = 6; //6 or 7 ideal says GSI
 		eps = _eps;
 	}
 
@@ -515,10 +519,6 @@ public:
     	Ray ray;
 		for (int i = 0; i < objects.size(); i++) {
 			ray = objects[i]->transformRay(testRay);
-            // cout << ray.pos;
-            // cout << " ";
-            // cout << ray.vec << endl;
-            // exit(1);
 			float t = objects[i]->intersection(ray, eps);
 			vec3 intersection = ray.pointAt(t);
 			intersection = objects[i]->transformIntersection(intersection);
@@ -530,10 +530,10 @@ public:
 		    }
 		}
 		if (hitObject != NULL) {
-            vec3 normal = hitObject->normal(minIntersection);
+			//minIntersection = hitObject->inverseTransform * minIntersection;
+            vec3 normal = hitObject->normal(hitObject->inverseTransform * minIntersection);
             normal = hitObject->transformNormal(normal);
             normal.normalize();
-
             vec3 reflectionVec = ray.vec - (2*(ray.vec * normal))*normal;
             reflectionVec.normalize();
             Ray reflected = Ray(minIntersection, reflectionVec);
@@ -616,15 +616,17 @@ bool argumentMatches(string argument, const char *compare) {
 
 mat4 reduceTransforms(vector<mat4> *transforms) {
     mat4 tMatrix = identity3D();
-    for (int i = transforms->size() - 1; i > 0; i--) {
-        tMatrix = transforms->at(i) * tMatrix;
+    for (int i = 0; i < transforms->size(); i++) {
+        tMatrix = tMatrix * transforms->at(i);
     }
     return tMatrix;
 }
 
-void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat) {
+void parseObj(string fileName, vector<Polygon*> *sceneObjects, vector<mat4> *transforms, Material &curMat) {
 	vector<vec3> verts;
+	vector<vec3>normals;
 	verts.push_back(vec3(0, 0, 0)); // Kill index 0, since vertices are numbered 1 ... n
+	normals.push_back(vec3(0, 0, 0)); // Kill index 0, since normals are numbered 1 ... n
 	ifstream objFile(fileName);
 	string currentLine;
 	string argument;
@@ -642,10 +644,39 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
         	float args[3];
             parseArgs(args, &iss, 3, "Incorrect number of arguments for vertex in obj file.");
             verts.push_back(vec3(args[0], args[1], args[2]));
+        } else if (argumentMatches(argument, "vn")) {
+        	float args[3];
+            parseArgs(args, &iss, 3, "Incorrect number of arguments for vertex normal in obj file.");
+            vec3 norm = vec3(args[0], args[1], args[2]);
+            normals.push_back(norm);
         } else if (argumentMatches(argument, "f")) {
-        	int args[3];
-        	parseArgs(args, &iss, 3, "More than 3 vertices specified for face, only using first 3.");
-            Triangle *t = new Triangle(verts[args[0]], verts[args[1]], verts[args[2]], curMat, identity3D());
+        	bool normalSpecified = false;
+            int vertArgs[3];
+            int normalArgs[3];
+            string temp;
+            int index = 0;
+            while (iss >> temp) {
+            	normalSpecified = (temp.length() == 4);
+                if (normalSpecified) {
+                    vertArgs[index] = atoi(&(temp.c_str()[0]));
+                    normalArgs[index] = atoi(&(temp.c_str()[3]));
+                } else {
+                    vertArgs[index] = atoi(temp.c_str());
+                }
+                index++;
+            }
+            Triangle *t;
+            mat4 currentTransform = reduceTransforms(transforms);
+            if (normalSpecified) {
+            	vec3 n1 = normals[normalArgs[0]];
+            	vec3 n2 = normals[normalArgs[1]];
+            	vec3 n3 = normals[normalArgs[2]];
+                t = new Triangle(verts[vertArgs[0]], verts[vertArgs[1]], verts[vertArgs[2]], 
+                              curMat, currentTransform, n1, n2, n3);
+            } else {
+                t = new Triangle(verts[vertArgs[0]], verts[vertArgs[1]], verts[vertArgs[2]], 
+                                    curMat, currentTransform);
+            }
             sceneObjects->push_back(t);
         } else {
         	cerr << "Unknown input in obj file: " << fileName << "." << endl;
@@ -709,13 +740,6 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
                 float args[4];
                 parseArgs(args, &iss, 4, "Incorrect number of arguments for sphere.");
                 vec3 sphereCenter = vec3(args[0],args[1],args[2]);
-                /*
-                if (transforms.size() == 1) {
-                    sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat, identity3D()));
-                } else {
-                    mat4 currentTransform = reduceTransforms(&transforms);
-                    sceneObjects.push_back(new Ellipse(sphereCenter, args[3], curMat, currentTransform));
-                }*/
                 mat4 currentTransform = reduceTransforms(&transforms);
                 sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat, currentTransform));
             } else if (argumentMatches(argument, "tri")) {
@@ -725,9 +749,7 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
                 vec3 v2 = vec3(args[3],args[4],args[5]);
                 vec3 v3 = vec3(args[6],args[7],args[8]);
                 mat4 currentTransform = reduceTransforms(&transforms);
-                cout << currentTransform << endl;
                 sceneObjects.push_back(new Triangle(v1, v2, v3, curMat, currentTransform));
-
             } else if (argumentMatches(argument, "ltp")) {
                 float args[6];
                 int falloff = 0;
@@ -763,7 +785,7 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
             } else if (argumentMatches(argument, "obj")) {
                 string temp;
                 iss >> temp;
-                parseObj(temp.c_str(), &sceneObjects, curMat);
+                parseObj(temp.c_str(), &sceneObjects, &transforms, curMat);
             } else if (argumentMatches(argument, "xfs")) {
                 float args[3];
                 parseArgs(args, &iss, 3, "Incorrect number of arguments for scaling transformation.");
