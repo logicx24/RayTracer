@@ -1,10 +1,10 @@
 /*********************************************
- ____             _                           
-|  _ \ __ _ _   _| |_ _ __ __ _  ___ ___ _ __ 
+ ____             _
+|  _ \ __ _ _   _| |_ _ __ __ _  ___ ___ _ __
 | |_) / _` | | | | __| '__/ _` |/ __/ _ \ '__|
-|  _ < (_| | |_| | |_| | | (_| | (_|  __/ |   
-|_| \_\__,_|\__, |\__|_|  \__,_|\___\___|_|   
-            |___/    
+|  _ < (_| | |_| | |_| | | (_| | (_|  __/ |
+|_| \_\__,_|\__, |\__|_|  \__,_|\___\___|_|
+            |___/
 
 Aakash Japi
 Jonathan Tau
@@ -172,8 +172,8 @@ public:
 };
 
 vec3 floatToByte(vec3 &fcolor) {
-	return vec3((int)(fcolor[RED] * 255.0f), 
-	            (int)(fcolor[GREEN] * 255.0f), 
+	return vec3((int)(fcolor[RED] * 255.0f),
+	            (int)(fcolor[GREEN] * 255.0f),
 	            (int)(fcolor[BLUE] * 255.0f));
 }
 
@@ -225,7 +225,7 @@ public:
             	image.at(position)     = film.at((pixHeight - y - 1) * width + x)[RED];
             	image.at(position + 1) = film.at((pixHeight - y - 1) * width + x)[GREEN];
             	image.at(position + 2) = film.at((pixHeight - y - 1) * width + x)[BLUE];
-            	image.at(position + 3) = 255; 
+            	image.at(position + 3) = 255;
             }
         }
         unsigned error = lodepng::encode(fileName, image,  width, height);
@@ -245,30 +245,48 @@ public:
     Polygon(mat4 &_transform, Material &_mat) {
     	mat = _mat;
     	transform= _transform;
+        //cout << transform << endl;
     	inverseTransform = transform.inverse();
     	inverseTranspose = inverseTransform.transpose();
     }
     Ray transformRay(Ray &ray) {
         vec4 tmpPos = vec4(ray.pos, 1.0f);
-        tmpPos = tmpPos * inverseTransform;
+        // cout << tmpPos;
+        // cout << " ";
+        tmpPos = inverseTransform * tmpPos;
+        // cout << tmpPos << endl;
+        // cout << inverseTransform << endl;
         vec3 rayPos = vec3(tmpPos);
+        // cout << ray.pos;
+        // cout << " ";
+        // cout << rayPos <<endl;
+
 
         vec4 tmpVec = vec4(ray.vec, 0.0f);
-        tmpVec = tmpVec * inverseTransform;
+        tmpVec = inverseTransform * tmpVec;
+
+
         vec3 rayVec = vec3(tmpVec, VW);
-        
+
         return Ray(rayPos, rayVec);
     }
     vec3 transformNormal(vec3 &normal) {
 
         vec4 normal4= vec4(normal, 0.0f);
+        // cout << normal4;
+        // cout << " ";
+        // cout << inverseTranspose << endl;
+
         normal4 = inverseTranspose * normal4;
+        // cout << normal4;
+        // exit(1);
+
         vec3 normal3  = vec3(normal4, VW);
         return normal3;
     }
     vec3 transformIntersection(vec3 &intersection) {
     	vec4 tmpIntersection = vec4(intersection, 1.0f);
-    	tmpIntersection = tmpIntersection * transform;
+    	tmpIntersection = transform * tmpIntersection;
     	vec3 intersection3 = vec3(tmpIntersection);
         return intersection3;
     }
@@ -281,7 +299,7 @@ class Triangle : public Polygon {
 public:
     vec3 vertex1, vertex2, vertex3, edge1, edge2;
 
-    Triangle(vec3 &_v1, vec3 &_v2, vec3 &_v3, Material &_mat, mat4 _transform) 
+    Triangle(vec3 &_v1, vec3 &_v2, vec3 &_v3, Material &_mat, mat4 _transform)
     : Polygon(_transform, _mat) {
         vertex1 = _v1;
         vertex2 = _v2;
@@ -296,7 +314,7 @@ public:
     }
 
     float intersection(Ray &ray, float eps) {
-        vec3 normal = (edge2 ^ edge1).normalize(); 
+        vec3 normal = (edge2 ^ edge1).normalize();
         vec3 w0 = ray.pos - vertex1;
         float a = -(normal * w0);
         float b = normal * ray.vec;
@@ -352,13 +370,16 @@ class Sphere : public Polygon {
 public:
 	vec3 center;
 	float radius;
+    mat4 ghx;
 
     Sphere(){}
 
-	Sphere(vec3 &_center, float _radius, Material &_mat, mat4 _transform) 
+	Sphere(vec3 &_center, float _radius, Material &_mat, mat4 _transform)
 	: Polygon(_transform, _mat) {
+        cout << _transform << endl;
 		center = _center;
 		radius = _radius;
+        ghx = _transform.inverse();
 	}
 
 	bool intersects(Ray &ray) {
@@ -389,7 +410,8 @@ public:
 	}
 
     vec3 normal(vec3 &point) {
-    	vec3 normal = (point - center).normalize();
+    	//vec3 normal = (point - center).normalize();
+        vec3 normal = (vec3(ghx * point) - center);
     	return normal;
     }
 };
@@ -449,7 +471,7 @@ public:
 		Light ambientLight = Light(defaultAmbientColor);
 		width = _width;
 		height = _height;
-		maxDepth = 3;
+		maxDepth = 3; //6 or 7 ideal says GSI
 		eps = _eps;
 	}
 
@@ -488,11 +510,15 @@ public:
 
     vec3 traceRay(Ray &testRay, int depth) {
 		Polygon *hitObject = NULL;
-    	float min_dist = MAXFLOAT; 
+    	float min_dist = MAXFLOAT;
 		vec3 minIntersection;
     	Ray ray;
 		for (int i = 0; i < objects.size(); i++) {
 			ray = objects[i]->transformRay(testRay);
+            // cout << ray.pos;
+            // cout << " ";
+            // cout << ray.vec << endl;
+            // exit(1);
 			float t = objects[i]->intersection(ray, eps);
 			vec3 intersection = ray.pointAt(t);
 			intersection = objects[i]->transformIntersection(intersection);
@@ -507,8 +533,8 @@ public:
             vec3 normal = hitObject->normal(minIntersection);
             normal = hitObject->transformNormal(normal);
             normal.normalize();
-            
-            vec3 reflectionVec = ray.vec - (2*(ray.vec * normal))*normal; 
+
+            vec3 reflectionVec = ray.vec - (2*(ray.vec * normal))*normal;
             reflectionVec.normalize();
             Ray reflected = Ray(minIntersection, reflectionVec);
             if (depth == 0) {
@@ -622,7 +648,7 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, Material &curMat)
             Triangle *t = new Triangle(verts[args[0]], verts[args[1]], verts[args[2]], curMat, identity3D());
             sceneObjects->push_back(t);
         } else {
-        	cerr << "Unknown input in obj file: " << fileName << "." << endl; 
+        	cerr << "Unknown input in obj file: " << fileName << "." << endl;
         }
     }
     objFile.close();
@@ -633,11 +659,11 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
     vec3 eye, ll, lr, ul, ur, ka, kd, ks, kr;
 
     mat4 currTrans = identity3D();
-    
+
     Film film = Film(width, height);
     Camera pcam;
     Scene *scene;
-    
+
     Material curMat;
     vector<Polygon*> sceneObjects;
     vector<Light*> sceneLights;
@@ -668,7 +694,7 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
 
                 pcam = Camera(eye, ul, ur, ll, lr, width, height);
                 scene = new Scene(pcam, film, eps, width, height);
-            
+
             } else if (argumentMatches(argument, "mat")) {
                 float args[13];
                 parseArgs(args, &iss, 13, "Incorrect number of arguments for material.");
@@ -678,7 +704,7 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
                 sp = args[9];
                 kr = vec3(args[10],args[11],args[12]);
                 curMat = Material(ka,kd,ks, kr,sp);
-            
+
             } else if (argumentMatches(argument, "sph")) {
                 float args[4];
                 parseArgs(args, &iss, 4, "Incorrect number of arguments for sphere.");
@@ -691,15 +717,17 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
                     sceneObjects.push_back(new Ellipse(sphereCenter, args[3], curMat, currentTransform));
                 }*/
                 mat4 currentTransform = reduceTransforms(&transforms);
-                sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat, currentTransform)); 
+                sceneObjects.push_back(new Sphere(sphereCenter, args[3], curMat, currentTransform));
             } else if (argumentMatches(argument, "tri")) {
                 float args[9];
                 parseArgs(args, &iss, 9, "Incorrect number of arguments for triangle.");
                 vec3 v1 = vec3(args[0],args[1],args[2]);
                 vec3 v2 = vec3(args[3],args[4],args[5]);
                 vec3 v3 = vec3(args[6],args[7],args[8]);
-                sceneObjects.push_back(new Triangle(v1, v2, v3, curMat, identity3D()));
-            
+                mat4 currentTransform = reduceTransforms(&transforms);
+                cout << currentTransform << endl;
+                sceneObjects.push_back(new Triangle(v1, v2, v3, curMat, currentTransform));
+
             } else if (argumentMatches(argument, "ltp")) {
                 float args[6];
                 int falloff = 0;
@@ -755,7 +783,7 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
                 transforms.clear();
                 transforms.push_back(identity3D());
             }
-        } 
+        }
 
         for (int i = 0; i < sceneObjects.size(); i++){
             scene->addObject(sceneObjects[i]);
@@ -763,7 +791,7 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
         for (int i = 0; i < sceneLights.size(); i++) {
             scene->addLight(sceneLights[i]);
         }
-        
+
         myfile.close();
 
     } else {
@@ -774,29 +802,29 @@ Scene* parseSceneFile(string fileName, float eps, int width, int height) {
 }
 
 int main(int argc, char* argv[]) {
-   
+
     cout << "Ray Tracer!" << endl;
-     
+
     string outFile = "output.png";
 
     float eps = 0.05f;
     int width = 1000;
     int height = 1000;
-   
+
     Scene *scene = parseSceneFile(argv[1], eps, width, height);
 
     cout << "Rendering Scene..." << endl;
 
     scene->render();
-    
+
     cout << "Scene render completed." << endl;
     cout << "Writing to file..." << endl;
-    
+
     if (argc > 2) outFile = argv[2];
     scene->writeFile(outFile, width, height);
-    
+
     cout << "Image saved as " << outFile << "." << endl;
-        
+
 	return 0;
 }
 
