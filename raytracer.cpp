@@ -617,7 +617,7 @@ bool argumentMatches(string argument, const char *compare) {
 mat4 reduceTransforms(vector<mat4> *transforms) {
     mat4 tMatrix = identity3D();
     for (int i = transforms->size() - 1; i > 0; i--) {
-        tMatrix = tMatrix * transforms->at(i);
+        tMatrix = transforms->at(i) * tMatrix;
     }
     return tMatrix;
 }
