@@ -365,7 +365,6 @@ public:
             float alpha = a2 / a1;
             float beta = a3 / a1;
             float gamma = 1.0f - alpha - beta;
-
             vec3 iNormal = alpha * normal1 + beta * normal2 + gamma * normal3;
             return iNormal;
         } else {
@@ -656,10 +655,28 @@ void parseObj(string fileName, vector<Polygon*> *sceneObjects, vector<mat4> *tra
             string temp;
             int index = 0;
             while (iss >> temp) {
-            	normalSpecified = (temp.length() == 4);
+            	normalSpecified = (temp.find("//") != string::npos);
+                /*
+            	std::string s = "scott>=tiger>=mushroom";
+            	std::string delimiter = ">=";
+
+            	size_t pos = 0;
+            	std::string token;
+                while ((pos = s.find(delimiter)) != std::string::npos) {
+                	    token = s.substr(0, pos);
+                	        std::cout << token << std::endl;
+                	            s.erase(0, pos + delimiter.length());
+
+                }
+                std::cout << s << std::endl;
+                */
                 if (normalSpecified) {
-                    vertArgs[index] = atoi(&(temp.c_str()[0]));
-                    normalArgs[index] = atoi(&(temp.c_str()[3]));
+                	string delimeter = "//";
+                	int pos = temp.find(delimeter);
+                    string face = temp.substr(0, pos);
+                    vertArgs[index] = stoi(face);
+                    temp.erase(0, pos + delimeter.length());
+                    normalArgs[index] = stoi(temp);
                 } else {
                     vertArgs[index] = atoi(temp.c_str());
                 }
