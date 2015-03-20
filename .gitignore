@@ -1,5 +1,4 @@
 *.o
-*.png
 .DS_Store
 *.swp
 raytracer
