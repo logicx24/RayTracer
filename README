@@ -1,0 +1,10 @@
+Partners:
+Aakash Japi (cs184-eh)
+Gabriel Intrator (cs184-ag)
+Jonathon Tau (cs184-am)
+
+Platform: OS X.
+
+Our RayTracer has implemented all the mandatory features, and also allows for the interpolation of vertex normals in .obj files. To compile the program, just run "make" from within our directory, and then to run the actual program, use "./raytracer [scene filename] [output filename]". Both the [scene file] and [output file] should be paths to a .scene file and to a file you like to output the image into (if it doesn't exist, we'll create it). 
+
+
