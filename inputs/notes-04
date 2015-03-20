@@ -1,0 +1,15 @@
+command line used: ./raytracer input-04 image-04.png
+
+Took 1 second to run.
+
+Features demonstrated: Simple phong diffuse shading & directional light
+
+
+
+input-04 contains:
+
+cam   0 0 2   -1 -1 1   1 -1 1   -1 1 1   1 1 1
+mat   1 1 1   1 0 1  0 0 0   64   0 0 0
+ltd   -1 -1 -1   1 1 1
+sph   0 0 0   0.65
+sph   0.6 0.6 0.7   0.1

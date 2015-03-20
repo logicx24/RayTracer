@@ -1,0 +1,15 @@
+command line used: ./raytracer input-09 image-09.png
+
+Took a few minutes to run.
+
+Features demonstrated: rendering OBJ file of a gourd, with flat shading
+
+
+
+input-09 contains:
+
+cam   0 0 2   -1 -1 1   1 -1 1   -1 1 1   1 1 1
+mat 0.1 0.1 0.1 1 0 1 1 1 1 50 0 0 0
+obj gourd.obj
+ltd 0.57735027 -0.57735027 -0.57735027 1 1 1
+ltd 0.57735027  0.57735027 -0.57735027 0 0 1

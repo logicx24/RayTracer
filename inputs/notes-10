@@ -1,0 +1,25 @@
+command line used: ./raytracer input-10 image-10.png
+
+Renders in about a minute.
+
+Features demonstrated: triangles, spheres, reflections, shadows
+
+input-10 contains:
+
+cam 0 0 0 -1 -1 -1 1 -1 -1 -1 1 -1 1 1 -1
+
+mat 0.1 0.1 0.1 0.3 0.5 0.7 1 1 1 50 0 0 0
+sph 0 0 -3 0.7
+
+mat 0.1 0.1 0.1 0.7 0.1 0.9 1 1 1 50 0 0 0
+sph -1 1 -4 0.3
+
+mat 0.1 0.1 0.1 0.1 0.8 0.2 1 1 1 50 0 0 0
+sph 1 2 -5 0.5
+
+mat 0.1 0.1 0.1 0.2 0.1 0.3 0.7 0.8 0.9 50 1 1 1
+tri 5 5 -5 -4 4 -7 3 -1 -7
+
+lta 0.4 0.4 0.4
+ltp 1 1 1 0.5 0.5 0.8
+ltp -1 0 0 0.2 0.6 0.7

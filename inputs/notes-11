@@ -1,3 +1,11 @@
+command line used: ./raytracer input-11 image-11.png
+
+Renders in about a minute.
+
+Features demonstrated: triangles, spheres, reflections, shadows
+
+input-11 contains:
+
 cam   0 0 2   -1 -1 1   1 -1 1   -1 1 1   1 1 1
 
 mat   0 0 0  .3 .3 .3   0.5 0.5 0.5   64   1 1 1
@@ -16,8 +24,9 @@ mat   0.1 0.1 0.1   0.9 0.4 .4   0.3 0.3 0.3   64   0 0 0
 sph 0.5 1 -2 0.5
 
 lta 1 1 1
-ltp   2 2 2 0.5 0.8 0.9
+ltp 2 2 2 0.5 0.8 0.9
 ltp -2 2 2 0.9 0.2 0.3
 ltp -2 -2 2 0.1 0.4 0.7
 ltp 2 -2 2 0.9 0.7 0.3
+
 

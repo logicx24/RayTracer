@@ -1,0 +1,15 @@
+command line used: ./raytracer input-02 image-02.png
+
+Took 1 second to run.
+
+Features demonstrated: Simple phong specular shading & point/ambient light
+
+
+
+input-02 contains:
+
+cam   0 0 2   -1 -1 1   1 -1 1   -1 1 1   1 1 1
+mat   1 1 1   0 0 0  1 1 1   64   0 0 0
+lta   .4 0 .4
+ltp   1 1 1   1 1 1   0
+sph   0 0 0   0.65

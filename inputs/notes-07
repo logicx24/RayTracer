@@ -1,0 +1,17 @@
+command line used: ./raytracer input-07 image-07.png
+
+Took 2 seconds to run.
+
+Features demonstrated: Scale and translation of sphere centered at origin.
+
+
+
+input-07 contains:
+
+cam   0 0 2   -1 -1 1   1 -1 1   -1 1 1   1 1 1
+xft 1 0 0
+xfs 0.25 2 1
+mat 0.1 0.1 0.1 1 0 1 1 1 1 50 0 0 0
+sph 0  0 0 0.65
+ltd 0.57735027 -0.57735027 -0.57735027 1 1 1
+ltd 0.57735027  0.57735027 -0.57735027 0 0 1
